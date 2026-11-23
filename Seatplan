@@ -1,1 +1,3313 @@
+```react
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  signInAnonymously,
+  signInWithCustomToken,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  collection,
+  writeBatch
+} from 'firebase/firestore';
+import {
+  Users,
+  LayoutGrid,
+  History,
+  Settings,
+  Plus,
+  Search,
+  Upload,
+  Download,
+  Trash2,
+  Edit3,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Printer,
+  ChevronRight,
+  School,
+  Calendar,
+  Clock,
+  Building2,
+  ShieldCheck,
+  LogOut,
+  LogIn,
+  X,
+  Eye,
+  ArrowUpDown,
+  Sparkles,
+  Check,
+  Menu,
+  FileSpreadsheet,
+  Layers,
+  Shuffle
+} from 'lucide-react';
 
+// ============================================================================
+// 1. FIREBASE CONFIGURATION & INITIALIZATION
+// ============================================================================
+const firebaseConfig = typeof __firebase_config !== 'undefined'
+  ? JSON.parse(__firebase_config)
+  : {
+      apiKey: "demo-api-key",
+      authDomain: "demo.firebaseapp.com",
+      projectId: "demo-project",
+      storageBucket: "demo.appspot.com",
+      messagingSenderId: "000000",
+      appId: "1:000000:web:000000"
+    };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'student-seat-plan-erp';
+
+// Strict Firestore paths per environment rules
+const getCollectionRef = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+const getDocRef = (colName, docId) => doc(db, 'artifacts', appId, 'public', 'data', colName, docId);
+
+// ============================================================================
+// 2. BILINGUAL DICTIONARY, COLORS & CONSTANTS (ENGLISH & BANGLA)
+// ============================================================================
+const CLASSES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const CLASS_BADGE_COLORS = {
+  1: 'bg-rose-50 text-rose-700 border-rose-200',
+  2: 'bg-orange-50 text-orange-700 border-orange-200',
+  3: 'bg-amber-50 text-amber-700 border-amber-200',
+  4: 'bg-lime-50 text-lime-700 border-lime-200',
+  5: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  6: 'bg-teal-50 text-teal-700 border-teal-200',
+  7: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  8: 'bg-sky-50 text-sky-700 border-sky-200',
+  9: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  10: 'bg-purple-50 text-purple-700 border-purple-200'
+};
+
+const LABELS = {
+  en: {
+    seatPlanTitle: 'EXAMINATION SEAT PLAN',
+    hallWiseTitle: 'HALL-WISE EXAMINATION SEAT PLAN',
+    completeTitle: 'COMPLETE EXAMINATION SEAT PLAN',
+    studentWiseTitle: 'STUDENT-WISE SEAT ALLOCATION LIST',
+    examName: 'Examination',
+    examDate: 'Date',
+    shift: 'Shift',
+    hallNo: 'Hall',
+    rowNo: 'Row',
+    benchNo: 'Bench',
+    seatPos: 'Seat',
+    studentName: 'Student Name',
+    rollNo: 'Roll No.',
+    classLabel: 'Class',
+    totalAllocated: 'Total Allocated Students',
+    hallTotal: 'Hall Total',
+    authorizedSignature: 'Authorized Signature & Seal',
+    controllerOfExams: 'Controller of Examinations / Head of Institution',
+    generatedOn: 'Generated on',
+    page: 'Page',
+    of: 'of',
+    left: 'Left',
+    mid: 'Mid',
+    right: 'Right',
+    center: 'Single',
+    colNo: 'Column',
+    sl: 'SL'
+  },
+  bn: {
+    seatPlanTitle: 'পরীক্ষার আসন বিন্যাস',
+    hallWiseTitle: 'কক্ষ ভিত্তিক পরীক্ষার আসন বিন্যাস',
+    completeTitle: 'সম্পূর্ণ পরীক্ষার আসন বিন্যাস',
+    studentWiseTitle: 'শিক্ষার্থী ভিত্তিক আসন তালিকা',
+    examName: 'পরীক্ষার নাম',
+    examDate: 'তারিখ',
+    shift: 'শিফট',
+    hallNo: 'কক্ষ নং',
+    rowNo: 'সারি',
+    benchNo: 'বেঞ্চ',
+    seatPos: 'আসন',
+    studentName: 'শিক্ষার্থীর নাম',
+    rollNo: 'রোল নং',
+    classLabel: 'শ্রেণি',
+    totalAllocated: 'মোট বরাদ্দকৃত শিক্ষার্থী',
+    hallTotal: 'কক্ষে মোট শিক্ষার্থী',
+    authorizedSignature: 'অনুমোদিত স্বাক্ষর ও সিলমোহর',
+    controllerOfExams: 'পরীক্ষা নিয়ন্ত্রক / প্রতিষ্ঠান প্রধান',
+    generatedOn: 'তৈরির তারিখ',
+    page: 'পৃষ্ঠা',
+    of: '/',
+    left: 'বাম',
+    mid: 'মাঝে',
+    right: 'ডান',
+    center: 'একক',
+    colNo: 'কলাম',
+    sl: 'ক্রম'
+  }
+};
+
+const toBengaliDigits = (str) => {
+  if (str === null || str === undefined) return '';
+  const map = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return String(str).replace(/\d/g, (d) => map[parseInt(d, 10)]);
+};
+
+const formatNum = (val, lang) => (lang === 'bn' ? toBengaliDigits(val) : String(val));
+
+const formatSeatPos = (pos, lang) => {
+  const t = LABELS[lang];
+  if (pos === 'Left') return t.left;
+  if (pos === 'Mid') return t.mid;
+  if (pos === 'Right') return t.right;
+  return t.center;
+};
+
+// Fisher-Yates shuffle helper for Roll Mix strategies
+const shuffleArray = (arr) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+// ============================================================================
+// 3. EXTERNAL SCRIPT LOADER (SheetJS, jsPDF, html2canvas) & FONTS
+// ============================================================================
+const loadScript = (src) =>
+  new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+// ============================================================================
+// 4. MAIN APPLICATION COMPONENT
+// ============================================================================
+export default function App() {
+  // Auth & User State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authError, setAuthError] = useState('');
+
+  // Navigation State
+  const [activeTab, setActiveTab] = useState('students'); // 'students' | 'create' | 'history' | 'settings'
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Toast Notification State (replaces alert/confirm)
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type, id: Date.now() });
+    setTimeout(() => {
+      setToast((prev) => (prev && prev.message === message ? null : prev));
+    }, 4000);
+  };
+
+  // Firestore Collections State
+  const [students, setStudents] = useState([]);
+  const [examinations, setExaminations] = useState([]);
+  const [institution, setInstitution] = useState({
+    institution_name: 'St. Xavier Ideal High School & College',
+    institution_name_bn: 'সেন্ট জেভিয়ার আদর্শ উচ্চ বিদ্যালয় ও কলেজ',
+    institution_address: 'Dhanmondi, Dhaka-1205, Bangladesh',
+    institution_logo: '',
+    authorized_teacher_name: 'Prof. Mahmudul Hasan',
+    authorized_designation: 'Controller of Examinations',
+    default_language: 'en',
+    default_orientation: 'portrait'
+  });
+
+  // PDF Modal State
+  const [pdfExamData, setPdfExamData] = useState(null);
+
+  // Inject Google Fonts (Inter + Noto Sans Bengali) & Libraries on Mount
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+
+    Promise.all([
+      loadScript('https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+    ]).catch((err) => console.error('Library preload warning:', err));
+  }, []);
+
+  // Firebase Auth Initialization (Rule 3)
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error('Initial auth error:', err);
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore Real-time Listeners (Guarded by user)
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubStudents = onSnapshot(
+      getCollectionRef('students'),
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setStudents(list);
+      },
+      (err) => console.error('Students listener error:', err)
+    );
+
+    const unsubExams = onSnapshot(
+      getCollectionRef('examinations'),
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.finalized_at || b.created_at || '').localeCompare(a.finalized_at || a.created_at || ''));
+        setExaminations(list);
+      },
+      (err) => console.error('Examinations listener error:', err)
+    );
+
+    const unsubSettings = onSnapshot(
+      getDocRef('institution_settings', 'primary'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setInstitution((prev) => ({ ...prev, ...docSnap.data() }));
+        }
+      },
+      (err) => console.error('Settings listener error:', err)
+    );
+
+    return () => {
+      unsubStudents();
+      unsubExams();
+      unsubSettings();
+    };
+  }, [user]);
+
+  const handleEmailAuth = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      if (authMode === 'login') {
+        await signInWithEmailAndPassword(auth, authEmail, authPass);
+        showToast('Signed in as Administrator');
+      } else {
+        await createUserWithEmailAndPassword(auth, authEmail, authPass);
+        showToast('Admin account created and signed in');
+      }
+      setShowAuthModal(false);
+      setAuthEmail('');
+      setAuthPass('');
+    } catch (err) {
+      setAuthError(err.message || 'Authentication failed');
+    }
+  };
+
+  const handleSignOutToAnonymous = async () => {
+    try {
+      await signOut(auth);
+      await signInAnonymously(auth);
+      showToast('Switched to session access');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-slate-700 font-semibold text-lg">Initializing ExamSeat Pro ERP...</p>
+        <p className="text-slate-400 text-sm mt-1">Connecting to permanent database</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row"
+      style={{ fontFamily: "'Inter', 'Noto Sans Bengali', sans-serif" }}
+    >
+      {/* Print-specific CSS */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #printable-pdf-area, #printable-pdf-area * {
+            visibility: visible !important;
+          }
+          #printable-pdf-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+          .pdf-page-sheet {
+            box-shadow: none !important;
+            margin: 0 !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+          .pdf-page-sheet:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+        }
+      `}</style>
+
+      {/* Toast Notification Banner */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-md">
+          <div
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium ${
+              toast.type === 'error'
+                ? 'bg-rose-600 text-white border-rose-700'
+                : 'bg-slate-900 text-white border-slate-800'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            )}
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="ml-2 opacity-75 hover:opacity-100">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Top Header */}
+      <header className="lg:hidden bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow">
+            <School className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="font-bold text-sm leading-tight truncate max-w-[200px]">
+              {institution.institution_name}
+            </h1>
+            <p className="text-[11px] text-slate-400">Exam Seat & Student ERP</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+          aria-label="Toggle Menu"
+        >
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </header>
+
+      {/* Sidebar Navigation */}
+      <aside
+        className={`${
+          mobileMenuOpen ? 'fixed inset-0 z-40 flex' : 'hidden'
+        } lg:flex lg:w-72 lg:shrink-0 flex-col bg-slate-900 text-slate-200 border-r border-slate-800 lg:sticky lg:top-0 lg:h-screen`}
+      >
+        <div className="p-6 border-b border-slate-800/80 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {institution.institution_logo ? (
+              <img
+                src={institution.institution_logo}
+                alt="Logo"
+                className="w-10 h-10 rounded-xl object-contain bg-white p-1"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+                <School className="w-6 h-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="font-bold text-white text-sm leading-snug line-clamp-2">
+                {institution.institution_name}
+              </div>
+              <div className="text-xs text-indigo-400 font-medium mt-0.5">Admin Control Panel</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Academic Operations
+          </div>
+
+          <button
+            onClick={() => {
+              setActiveTab('students');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'students'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Users className="w-5 h-5" />
+              Student Database
+            </span>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                activeTab === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {students.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('create');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'create'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <LayoutGrid className="w-5 h-5" />
+              Create Seat Plan
+            </span>
+            <ChevronRight className="w-4 h-4 opacity-60" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('history');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'history'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <History className="w-5 h-5" />
+              Examination History
+            </span>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                activeTab === 'history' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {examinations.length}
+            </span>
+          </button>
+
+          <div className="pt-4 px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Configuration
+          </div>
+
+          <button
+            onClick={() => {
+              setActiveTab('settings');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'settings'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            }`}
+          >
+            <Settings className="w-5 h-5" />
+            Institution Settings
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-semibold text-slate-200">
+                {user?.email ? 'Verified Admin' : 'Active Admin Session'}
+              </span>
+            </div>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <p className="text-[11px] text-slate-400 truncate mb-3">
+            {user?.email || `Session ID: ${user?.uid?.slice(0, 12)}...`}
+          </p>
+          {user?.email ? (
+            <button
+              onClick={handleSignOutToAnonymous}
+              className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 flex items-center justify-center gap-2 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sign Out Email
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-indigo-300 flex items-center justify-center gap-2 transition"
+            >
+              <LogIn className="w-3.5 h-3.5" /> Admin Email Login
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        {activeTab === 'students' && (
+          <StudentManagementView
+            students={students}
+            user={user}
+            showToast={showToast}
+          />
+        )}
+
+        {activeTab === 'create' && (
+          <CreateSeatPlanView
+            students={students}
+            institution={institution}
+            user={user}
+            showToast={showToast}
+            onOpenPdfPreview={(examObj) => setPdfExamData(examObj)}
+          />
+        )}
+
+        {activeTab === 'history' && (
+          <ExaminationHistoryView
+            examinations={examinations}
+            institution={institution}
+            showToast={showToast}
+            onOpenPdfPreview={(examObj) => setPdfExamData(examObj)}
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <InstitutionSettingsView
+            institution={institution}
+            user={user}
+            showToast={showToast}
+          />
+        )}
+      </main>
+
+      {/* Admin Email Login Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                {authMode === 'login' ? 'Admin Email Sign In' : 'Register Admin Account'}
+              </h3>
+              <button onClick={() => setShowAuthModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              {authError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                  {authError}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Admin Email</label>
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="admin@school.edu.bd"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={authPass}
+                  onChange={(e) => setAuthPass(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition"
+              >
+                {authMode === 'login' ? 'Sign In' : 'Create Account'}
+              </button>
+            </form>
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'register' : 'login');
+                  setAuthError('');
+                }}
+                className="text-xs text-indigo-600 hover:underline font-medium"
+              >
+                {authMode === 'login'
+                  ? 'Need a new Admin email account? Register here'
+                  : 'Already have an Admin account? Sign in'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen PDF Preview & Download Modal */}
+      {pdfExamData && (
+        <PdfPreviewAndExportModal
+          exam={pdfExamData}
+          institution={institution}
+          onClose={() => setPdfExamData(null)}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 5. STUDENT MANAGEMENT VIEW (CRUD, SEARCH/FILTER/SORT, EXCEL IMPORT/TEMPLATE)
+// ============================================================================
+function StudentManagementView({ students, user, showToast }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
+  const [sortOrder, setSortOrder] = useState('asc');
+
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [formName, setFormName] = useState('');
+  const [formRoll, setFormRoll] = useState('');
+  const [formClass, setFormClass] = useState('1');
+  const [formError, setFormError] = useState('');
+  const [savingStudent, setSavingStudent] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importReport, setImportReport] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const classCounts = useMemo(() => {
+    const counts = {};
+    CLASSES.forEach((c) => (counts[c] = 0));
+    students.forEach((s) => {
+      const cls = Number(s.class);
+      if (counts[cls] !== undefined) counts[cls]++;
+    });
+    return counts;
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    return students
+      .filter((s) => {
+        if (selectedClassFilter !== 'ALL' && Number(s.class) !== Number(selectedClassFilter)) {
+          return false;
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const matchName = (s.name || '').toLowerCase().includes(q);
+          const matchRoll = String(s.roll || '').toLowerCase().includes(q);
+          return matchName || matchRoll;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const rollA = Number(a.roll);
+        const rollB = Number(b.roll);
+        const cmp =
+          !isNaN(rollA) && !isNaN(rollB)
+            ? rollA - rollB
+            : String(a.roll).localeCompare(String(b.roll), undefined, { numeric: true });
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
+  }, [students, selectedClassFilter, searchQuery, sortOrder]);
+
+  const openAddModal = () => {
+    setEditingStudent(null);
+    setFormName('');
+    setFormRoll('');
+    setFormClass(selectedClassFilter !== 'ALL' ? String(selectedClassFilter) : '1');
+    setFormError('');
+    setShowStudentModal(true);
+  };
+
+  const openEditModal = (student) => {
+    setEditingStudent(student);
+    setFormName(student.name);
+    setFormRoll(String(student.roll));
+    setFormClass(String(student.class));
+    setFormError('');
+    setShowStudentModal(true);
+  };
+
+  const handleSaveStudent = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setFormError('');
+
+    const trimmedName = formName.trim();
+    const trimmedRoll = formRoll.trim();
+    const numClass = Number(formClass);
+
+    if (!trimmedName) {
+      setFormError('Student Name is required.');
+      return;
+    }
+    if (!trimmedRoll) {
+      setFormError('Roll Number is required.');
+      return;
+    }
+    if (!CLASSES.includes(numClass)) {
+      setFormError('Class must be between 1 and 10.');
+      return;
+    }
+
+    const duplicate = students.find(
+      (s) =>
+        Number(s.class) === numClass &&
+        String(s.roll).trim().toLowerCase() === trimmedRoll.toLowerCase() &&
+        s.id !== editingStudent?.id
+    );
+    if (duplicate) {
+      setFormError(`Roll "${trimmedRoll}" already exists in Class ${numClass} (${duplicate.name}).`);
+      return;
+    }
+
+    setSavingStudent(true);
+    try {
+      const now = new Date().toISOString();
+      if (editingStudent) {
+        await updateDoc(getDocRef('students', editingStudent.id), {
+          name: trimmedName,
+          roll: isNaN(Number(trimmedRoll)) ? trimmedRoll : Number(trimmedRoll),
+          class: numClass,
+          updated_at: now
+        });
+        showToast(`Updated ${trimmedName} (Class ${numClass}, Roll ${trimmedRoll})`);
+      } else {
+        await addDoc(getCollectionRef('students'), {
+          name: trimmedName,
+          roll: isNaN(Number(trimmedRoll)) ? trimmedRoll : Number(trimmedRoll),
+          class: numClass,
+          created_at: now,
+          updated_at: now
+        });
+        showToast(`Added ${trimmedName} to Class ${numClass}`);
+      }
+      setShowStudentModal(false);
+    } catch (err) {
+      console.error('Save student error:', err);
+      setFormError('Failed to save student to database. Please try again.');
+    } finally {
+      setSavingStudent(false);
+    }
+  };
+
+  const confirmDeleteStudent = async () => {
+    if (!user || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(getDocRef('students', deleteTarget.id));
+      showToast(`Deleted student ${deleteTarget.name}`);
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('Delete student error:', err);
+      showToast('Failed to delete student', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    if (!window.XLSX) {
+      showToast('Excel library is still loading, please wait a second...', 'error');
+      return;
+    }
+    const templateRows = [
+      { Name: 'Arafat Hossain', Roll: 1, Class: 6 },
+      { Name: 'Nusrat Jahan', Roll: 2, Class: 6 },
+      { Name: 'তানভীর আহমেদ', Roll: 1, Class: 7 }
+    ];
+    const ws = window.XLSX.utils.json_to_sheet(templateRows, { header: ['Name', 'Roll', 'Class'] });
+    ws['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 12 }];
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Students_Template');
+    window.XLSX.writeFile(wb, 'Student_Import_Template.xlsx');
+    showToast('Downloaded Excel template (Name, Roll, Class)');
+  };
+
+  const handleBulkFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!window.XLSX) {
+      showToast('Excel parser not ready yet. Please retry.', 'error');
+      return;
+    }
+
+    setImporting(true);
+    setImportReport(null);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = window.XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = window.XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+      if (rows.length === 0) {
+        setImportReport({
+          totalRows: 0,
+          importedCount: 0,
+          errors: [{ row: '-', reason: 'The uploaded file is empty or has no data rows.' }]
+        });
+        setImporting(false);
+        return;
+      }
+
+      const existingKeys = new Set(
+        students.map((s) => `${Number(s.class)}::${String(s.roll).trim().toLowerCase()}`)
+      );
+      const fileSeenKeys = new Set();
+
+      const validStudents = [];
+      const errors = [];
+
+      rows.forEach((rawRow, idx) => {
+        const excelRowNum = idx + 2;
+        const normalized = {};
+        Object.keys(rawRow).forEach((k) => {
+          normalized[k.trim().toLowerCase()] = rawRow[k];
+        });
+
+        const nameVal = String(normalized['name'] ?? normalized['student name'] ?? '').trim();
+        const rollRaw = String(normalized['roll'] ?? normalized['roll number'] ?? '').trim();
+        const classRaw = String(normalized['class'] ?? '').trim();
+        const classNum = Number(classRaw);
+
+        if (!nameVal) {
+          errors.push({ row: excelRowNum, reason: 'Empty Student Name' });
+          return;
+        }
+        if (!rollRaw) {
+          errors.push({ row: excelRowNum, reason: `Empty Roll Number for "${nameVal}"` });
+          return;
+        }
+        if (!classRaw || isNaN(classNum) || !CLASSES.includes(classNum)) {
+          errors.push({
+            row: excelRowNum,
+            reason: `Invalid Class "${classRaw}" for "${nameVal}" (Must be 1–10)`
+          });
+          return;
+        }
+
+        const key = `${classNum}::${rollRaw.toLowerCase()}`;
+        if (existingKeys.has(key)) {
+          errors.push({
+            row: excelRowNum,
+            reason: `Duplicate Roll ${rollRaw} in Class ${classNum} (Already exists in Database)`
+          });
+          return;
+        }
+        if (fileSeenKeys.has(key)) {
+          errors.push({
+            row: excelRowNum,
+            reason: `Duplicate Roll ${rollRaw} in Class ${classNum} (Repeated inside uploaded file)`
+          });
+          return;
+        }
+
+        fileSeenKeys.add(key);
+        existingKeys.add(key);
+        validStudents.push({
+          name: nameVal,
+          roll: isNaN(Number(rollRaw)) ? rollRaw : Number(rollRaw),
+          class: classNum
+        });
+      });
+
+      const now = new Date().toISOString();
+      for (let i = 0; i < validStudents.length; i += 400) {
+        const batch = writeBatch(db);
+        const chunk = validStudents.slice(i, i + 400);
+        chunk.forEach((st) => {
+          const newDocRef = doc(getCollectionRef('students'));
+          batch.set(newDocRef, {
+            ...st,
+            created_at: now,
+            updated_at: now
+          });
+        });
+        await batch.commit();
+      }
+
+      setImportReport({
+        totalRows: rows.length,
+        importedCount: validStudents.length,
+        errors
+      });
+
+      if (validStudents.length > 0) {
+        showToast(`Successfully imported ${validStudents.length} students!`);
+      }
+    } catch (err) {
+      console.error('Excel import error:', err);
+      setImportReport({
+        totalRows: 0,
+        importedCount: 0,
+        errors: [{ row: '-', reason: 'Failed to parse file. Please upload a valid .xlsx or .csv file.' }]
+      });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Page Header & Action Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Student Database</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage permanent student records across Classes 1–10 for automatic seat allocation.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleDownloadTemplate}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2 transition"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            Excel Template
+          </button>
+
+          <button
+            onClick={() => {
+              setImportReport(null);
+              setShowImportModal(true);
+            }}
+            className="px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold flex items-center gap-2 transition"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Import (.xlsx / .csv)
+          </button>
+
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-indigo-600/20 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Add Student
+          </button>
+        </div>
+      </div>
+
+      {/* Total & Class-Wise Student Count Chips */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Class-Wise Student Distribution
+          </span>
+          <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
+            Total Enrolled: {students.length}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedClassFilter('ALL')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
+              selectedClassFilter === 'ALL'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <span>All Classes</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[11px] ${
+                selectedClassFilter === 'ALL' ? 'bg-slate-700 text-white' : 'bg-white text-slate-600'
+              }`}
+            >
+              {students.length}
+            </span>
+          </button>
+
+          {CLASSES.map((cls) => {
+            const active = Number(selectedClassFilter) === cls;
+            return (
+              <button
+                key={cls}
+                onClick={() => setSelectedClassFilter(active ? 'ALL' : cls)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border transition flex items-center gap-2 ${
+                  active
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                }`}
+              >
+                <span>Class {cls}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold ${
+                    active ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {classCounts[cls]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Search, Filter & Sort Controls */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-50/70">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Student Name or Roll Number..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <select
+              value={selectedClassFilter}
+              onChange={(e) => setSelectedClassFilter(e.target.value)}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="ALL">Filter: All Classes</option>
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  Class {c} ({classCounts[c]})
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2 transition"
+            >
+              <ArrowUpDown className="w-4 h-4 text-indigo-600" />
+              Roll: {sortOrder === 'asc' ? 'Low → High' : 'High → Low'}
+            </button>
+          </div>
+        </div>
+
+        {/* Students Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <th className="py-3.5 px-5 w-16">#</th>
+                <th className="py-3.5 px-5">Student Name</th>
+                <th className="py-3.5 px-5 w-36">Roll Number</th>
+                <th className="py-3.5 px-5 w-36">Class</th>
+                <th className="py-3.5 px-5 text-right w-40">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 px-6 text-center text-slate-500">
+                    <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">No students found</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Add students manually or bulk import using an Excel (.xlsx) / CSV file.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student, index) => (
+                  <tr key={student.id} className="hover:bg-indigo-50/40 transition-colors">
+                    <td className="py-3.5 px-5 text-slate-400 font-mono text-xs">{index + 1}</td>
+                    <td className="py-3.5 px-5 font-semibold text-slate-900">{student.name}</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-mono font-bold text-xs">
+                        {student.roll}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-lg font-semibold text-xs border ${
+                          CLASS_BADGE_COLORS[Number(student.class)] ||
+                          'bg-indigo-50 text-indigo-700 border-indigo-100'
+                        }`}
+                      >
+                        Class {student.class}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditModal(student)}
+                          className="p-2 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                          title="Edit Student"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(student)}
+                          className="p-2 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition"
+                          title="Delete Student"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add / Edit Student Modal */}
+      {showStudentModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-slate-900">
+                {editingStudent ? 'Edit Student Record' : 'Add New Student'}
+              </h3>
+              <button
+                onClick={() => setShowStudentModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStudent} className="space-y-4">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  1. Student Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Enter full name (English or বাংলা)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    2. Roll Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formRoll}
+                    onChange={(e) => setFormRoll(e.target.value)}
+                    placeholder="e.g. 101"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    3. Class (1–10) *
+                  </label>
+                  <select
+                    value={formClass}
+                    onChange={(e) => setFormClass(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    {CLASSES.map((c) => (
+                      <option key={c} value={c}>
+                        Class {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowStudentModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingStudent}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md disabled:opacity-50"
+                >
+                  {savingStudent ? 'Saving...' : editingStudent ? 'Update Student' : 'Save Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Delete Student?</h3>
+            <p className="text-sm text-slate-600 mt-1.5">
+              Are you sure you want to permanently delete{' '}
+              <span className="font-bold text-slate-900">{deleteTarget.name}</span> (Class{' '}
+              {deleteTarget.class}, Roll {deleteTarget.roll})? Previous finalized exam snapshots will remain intact.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteStudent}
+                disabled={deleting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm"
+              >
+                {deleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Excel / CSV Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Bulk Import Students</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Upload an Excel (.xlsx, .xls) or .csv file with columns: <strong>Name</strong>,{' '}
+                  <strong>Roll</strong>, <strong>Class</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto pr-1">
+              <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-center">
+                <FileSpreadsheet className="w-10 h-10 text-indigo-600 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-800">
+                  Select Excel (.xlsx) or CSV File
+                </p>
+                <p className="text-xs text-slate-500 mt-1 mb-3">
+                  Automatically validates empty fields, Class (1–10), and duplicate Roll numbers per class.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleBulkFileUpload}
+                  className="hidden"
+                />
+                <div className="flex flex-wrap justify-center gap-2.5">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={importing}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm"
+                  >
+                    {importing ? 'Processing & Saving...' : 'Choose File & Import'}
+                  </button>
+                  <button
+                    onClick={handleDownloadTemplate}
+                    className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold"
+                  >
+                    Download Template
+                  </button>
+                </div>
+              </div>
+
+              {importReport && (
+                <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-slate-900">Import Validation Report</h4>
+                    <span className="text-xs text-slate-500">Total Rows Scanned: {importReport.totalRows}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                      <div className="text-xs text-emerald-700 font-medium">Successfully Imported</div>
+                      <div className="text-xl font-extrabold text-emerald-800 mt-0.5">
+                        {importReport.importedCount}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
+                      <div className="text-xs text-rose-700 font-medium">Skipped / Errors</div>
+                      <div className="text-xl font-extrabold text-rose-800 mt-0.5">
+                        {importReport.errors.length}
+                      </div>
+                    </div>
+                  </div>
+
+                  {importReport.errors.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-rose-700 mb-1.5">Error Details:</div>
+                      <div className="max-h-40 overflow-y-auto rounded-lg border border-rose-100 bg-rose-50/40 divide-y divide-rose-100 text-xs">
+                        {importReport.errors.map((err, i) => (
+                          <div key={i} className="px-3 py-2 flex items-start gap-2 text-rose-800">
+                            <span className="font-mono font-bold shrink-0">Row {err.row}:</span>
+                            <span>{err.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 6. CREATE SEAT PLAN VIEW (1-3 SEATS/BENCH, Z-STYLE & L-STYLE SERIAL / ROLL MIX)
+// ============================================================================
+function CreateSeatPlanView({
+  students,
+  institution,
+  user,
+  showToast,
+  onOpenPdfPreview
+}) {
+  // Step 1: Examination Metadata
+  const [examName, setExamName] = useState('Annual Examination 2026');
+  const [examDate, setExamDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [shiftName, setShiftName] = useState('Morning Shift (10:00 AM)');
+
+  // Step 2: Class Selection & Exclusion State
+  const [selectedClasses, setSelectedClasses] = useState([]);
+  const [excludedStudentIds, setExcludedStudentIds] = useState(() => new Set());
+  const [studentFilterText, setStudentFilterText] = useState('');
+
+  // Step 3: Examination Halls Configuration (Custom bench counts per column, 1-3 seats/bench)
+  const [halls, setHalls] = useState([
+    {
+      id: 'hall-1',
+      hall_number: '101',
+      column_benches: [4, 5],
+      seats_per_bench: 2
+    }
+  ]);
+
+  // 4 Seating Patterns:
+  // 'z-serial' | 'l-serial' | 'z-mix' | 'l-mix'
+  const [allocationStrategy, setAllocationStrategy] = useState('z-serial');
+
+  // Generated Allocations Preview & Finalization State
+  const [generatedAllocations, setGeneratedAllocations] = useState(null);
+  const [previewHallId, setPreviewHallId] = useState('hall-1');
+  const [finalizing, setFinalizing] = useState(false);
+
+  const toggleClass = (cls) => {
+    setGeneratedAllocations(null);
+    setSelectedClasses((prev) =>
+      prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls].sort((a, b) => a - b)
+    );
+  };
+
+  // Automatically fetch students matching selected classes
+  const fetchedStudents = useMemo(() => {
+    if (selectedClasses.length === 0) return [];
+    const setCls = new Set(selectedClasses.map(Number));
+    return students
+      .filter((s) => setCls.has(Number(s.class)))
+      .sort((a, b) => {
+        if (Number(a.class) !== Number(b.class)) return Number(a.class) - Number(b.class);
+        return Number(a.roll) - Number(b.roll);
+      });
+  }, [students, selectedClasses]);
+
+  const activeStudents = useMemo(() => {
+    return fetchedStudents.filter((s) => !excludedStudentIds.has(s.id));
+  }, [fetchedStudents, excludedStudentIds]);
+
+  const toggleExcludeStudent = (studentId) => {
+    setGeneratedAllocations(null);
+    setExcludedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  const addHall = () => {
+    setGeneratedAllocations(null);
+    const nextNum = 100 + halls.length + 1;
+    setHalls((prev) => [
+      ...prev,
+      {
+        id: `hall-${Date.now()}`,
+        hall_number: String(nextNum),
+        column_benches: [4, 5],
+        seats_per_bench: 2
+      }
+    ]);
+  };
+
+  const updateHall = (id, field, value) => {
+    setGeneratedAllocations(null);
+    setHalls((prev) => prev.map((h) => (h.id === id ? { ...h, [field]: value } : h)));
+  };
+
+  const updateHallColumnCount = (id, colCount) => {
+    setGeneratedAllocations(null);
+    const count = Math.max(1, Math.min(6, Number(colCount) || 1));
+    setHalls((prev) =>
+      prev.map((h) => {
+        if (h.id !== id) return h;
+        const current = Array.isArray(h.column_benches) ? [...h.column_benches] : [4, 5];
+        while (current.length < count) current.push(4);
+        return { ...h, column_benches: current.slice(0, count) };
+      })
+    );
+  };
+
+  const updateHallColumnBench = (id, colIdx, benchCount) => {
+    setGeneratedAllocations(null);
+    const benches = Math.max(0, Math.min(30, Number(benchCount) || 0));
+    setHalls((prev) =>
+      prev.map((h) => {
+        if (h.id !== id) return h;
+        const current = Array.isArray(h.column_benches) ? [...h.column_benches] : [4, 5];
+        current[colIdx] = benches;
+        return { ...h, column_benches: current };
+      })
+    );
+  };
+
+  const removeHall = (id) => {
+    if (halls.length <= 1) return;
+    setGeneratedAllocations(null);
+    setHalls((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const getHallColumnBenches = (h) => {
+    if (Array.isArray(h.column_benches) && h.column_benches.length > 0) {
+      return h.column_benches.map((b) => Math.max(0, Number(b) || 0));
+    }
+    const rows = Math.max(1, Number(h.total_rows || 1));
+    const cols = Math.max(1, Number(h.benches_per_row || 1));
+    return Array.from({ length: cols }, () => rows);
+  };
+
+  const totalSeatCapacity = useMemo(() => {
+    return halls.reduce((sum, h) => {
+      const totalBenchesInHall = getHallColumnBenches(h).reduce((a, b) => a + b, 0);
+      return sum + totalBenchesInHall * Math.min(3, Math.max(1, Number(h.seats_per_bench || 1)));
+    }, 0);
+  }, [halls]);
+
+  // ==========================================================================
+  // SMART SEAT ALLOCATION ALGORITHM (Z-STYLE & L-STYLE, SERIAL & ROLL MIX)
+  // ==========================================================================
+  const handleGenerateSeatPlan = () => {
+    if (!examName.trim()) {
+      showToast('Please enter an Examination Name.', 'error');
+      return;
+    }
+    if (activeStudents.length === 0) {
+      showToast('Please select at least one class with active students.', 'error');
+      return;
+    }
+    if (totalSeatCapacity < activeStudents.length) {
+      showToast(
+        `Insufficient hall capacity! Need ${activeStudents.length} seats, but only ${totalSeatCapacity} configured.`,
+        'error'
+      );
+      return;
+    }
+
+    // Deduplicate students by ID
+    const uniqueMap = new Map();
+    activeStudents.forEach((st) => {
+      if (!uniqueMap.has(st.id)) uniqueMap.set(st.id, st);
+    });
+    const pool = Array.from(uniqueMap.values());
+
+    const isZStyle = allocationStrategy.startsWith('z-');
+    const isRollMix = allocationStrategy.endsWith('-mix');
+
+    // Prepare per-class student queues (sorted by roll or shuffled for Roll Mix)
+    const activeClassList = [...new Set(pool.map((s) => Number(s.class)))].sort((a, b) => a - b);
+    const queuesByClass = {};
+    activeClassList.forEach((cls) => {
+      const clsStudents = pool
+        .filter((s) => Number(s.class) === cls)
+        .sort((a, b) => Number(a.roll) - Number(b.roll));
+      queuesByClass[cls] = isRollMix ? shuffleArray(clsStudents) : clsStudents;
+    });
+
+    const getSeatLabel = (seatsPerBench, seatIdx) => {
+      if (seatsPerBench === 1) return 'Single';
+      if (seatsPerBench === 2) return seatIdx === 0 ? 'Left' : 'Right';
+      // 3 seats per bench: Left, Mid, Right
+      if (seatIdx === 0) return 'Left';
+      if (seatIdx === 1) return 'Mid';
+      return 'Right';
+    };
+
+    const popNextStudentForClass = (preferredClassIdx) => {
+      const totalCls = activeClassList.length;
+      if (totalCls === 0) return null;
+      // Try preferred class first; if empty, pick next non-empty class
+      for (let offset = 0; offset < totalCls; offset++) {
+        const cls = activeClassList[(preferredClassIdx + offset) % totalCls];
+        if (queuesByClass[cls] && queuesByClass[cls].length > 0) {
+          return queuesByClass[cls].shift();
+        }
+      }
+      return null;
+    };
+
+    const hasRemainingStudents = () =>
+      activeClassList.some((cls) => queuesByClass[cls] && queuesByClass[cls].length > 0);
+
+    const allocations = [];
+    const numClasses = activeClassList.length;
+
+    for (const hall of halls) {
+      if (!hasRemainingStudents()) break;
+      const colBenchesArr = getHallColumnBenches(hall);
+      const seatsPerBench = Math.min(3, Math.max(1, Number(hall.seats_per_bench || 1)));
+      let hallBenchCounter = 1;
+
+      for (let colIdx = 0; colIdx < colBenchesArr.length; colIdx++) {
+        if (!hasRemainingStudents()) break;
+        const benchesInThisCol = colBenchesArr[colIdx];
+
+        for (let b = 0; b < benchesInThisCol; b++) {
+          if (!hasRemainingStudents()) break;
+          const rowInCol = b + 1;
+          const currentOverallBench = hallBenchCounter++;
+
+          for (let seatIdx = 0; seatIdx < seatsPerBench; seatIdx++) {
+            if (!hasRemainingStudents()) break;
+
+            let preferredClassIdx = 0;
+            if (numClasses > 1) {
+              if (isZStyle) {
+                // Z-Style: Zig-zag shift on every consecutive bench!
+                // Bench 1: [Class A, Class B] -> Bench 2: [Class B, Class A]
+                preferredClassIdx = (b + seatIdx) % numClasses;
+              } else {
+                // L-Style: Same seat side stays with same class down the column!
+                // Bench 1: [Class A, Class B] -> Bench 2: [Class A, Class B]
+                preferredClassIdx = seatIdx % numClasses;
+              }
+            }
+
+            const st = popNextStudentForClass(preferredClassIdx);
+            if (!st) break;
+
+            allocations.push({
+              student_id: st.id,
+              student_name_snapshot: st.name,
+              student_roll_snapshot: st.roll,
+              student_class_snapshot: Number(st.class),
+              hall_id: hall.id,
+              hall_number: String(hall.hall_number).trim() || 'Hall',
+              column_number: colIdx + 1,
+              row_number: rowInCol,
+              bench_number: currentOverallBench,
+              col_bench_number: rowInCol,
+              seat_index: seatIdx + 1,
+              seat_position: getSeatLabel(seatsPerBench, seatIdx)
+            });
+          }
+        }
+      }
+    }
+
+    setGeneratedAllocations(allocations);
+    setPreviewHallId(halls[0]?.id || '');
+    showToast(`Seat plan generated for ${allocations.length} students!`);
+  };
+
+  // Finalize & Permanently Save Snapshot to Firestore
+  const handleFinalizeAndSave = async () => {
+    if (!user || !generatedAllocations || generatedAllocations.length === 0) return;
+    setFinalizing(true);
+    try {
+      const now = new Date().toISOString();
+      const examPayload = {
+        institution_name: institution.institution_name,
+        institution_name_bn: institution.institution_name_bn || institution.institution_name,
+        exam_name: examName.trim(),
+        exam_date: examDate,
+        shift_name: shiftName.trim(),
+        selected_classes: selectedClasses,
+        allocation_strategy: allocationStrategy,
+        status: 'FINALIZED',
+        created_at: now,
+        finalized_at: now,
+        halls: halls.map((h) => {
+          const colBenches = getHallColumnBenches(h);
+          return {
+            id: h.id,
+            hall_number: String(h.hall_number).trim(),
+            column_benches: colBenches,
+            total_rows: Math.max(...colBenches, 1),
+            benches_per_row: colBenches.length,
+            seats_per_bench: Math.min(3, Math.max(1, Number(h.seats_per_bench || 1)))
+          };
+        }),
+        allocations: generatedAllocations
+      };
+
+      const docRef = await addDoc(getCollectionRef('examinations'), examPayload);
+      const savedExam = { id: docRef.id, ...examPayload };
+
+      showToast('Seat plan finalized & permanently saved to Examination History!');
+      onOpenPdfPreview(savedExam);
+    } catch (err) {
+      console.error('Finalize seat plan error:', err);
+      showToast('Failed to save examination seat plan.', 'error');
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
+  const displayedFetchedStudents = useMemo(() => {
+    if (!studentFilterText.trim()) return fetchedStudents;
+    const q = studentFilterText.toLowerCase();
+    return fetchedStudents.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        String(s.roll).toLowerCase().includes(q) ||
+        `class ${s.class}`.includes(q)
+    );
+  }, [fetchedStudents, studentFilterText]);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create Examination Seat Plan</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Select classes to automatically fetch students, configure columns & seats (1–3 per bench), and choose Z/L style allocation.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs font-semibold">
+          <div className="px-3.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100">
+            Selected Students: <span className="font-extrabold">{activeStudents.length}</span>
+          </div>
+          <div
+            className={`px-3.5 py-2 rounded-xl border ${
+              totalSeatCapacity >= activeStudents.length
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
+            }`}
+          >
+            Hall Capacity: <span className="font-extrabold">{totalSeatCapacity}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 1: Examination Details */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center gap-2.5 text-slate-900 font-bold text-base">
+          <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs flex items-center justify-center font-extrabold">
+            1
+          </span>
+          <h3>Examination Information</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              Examination Name *
+            </label>
+            <input
+              type="text"
+              value={examName}
+              onChange={(e) => setExamName(e.target.value)}
+              placeholder="e.g. Half-Yearly Examination 2026"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              Examination Date *
+            </label>
+            <input
+              type="date"
+              value={examDate}
+              onChange={(e) => setExamDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              Shift Name *
+            </label>
+            <input
+              type="text"
+              value={shiftName}
+              onChange={(e) => setShiftName(e.target.value)}
+              placeholder="e.g. Morning Shift / Day Shift"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Step 2: Select Classes & Automatic Student Fetching */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 text-slate-900 font-bold text-base">
+            <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs flex items-center justify-center font-extrabold">
+              2
+            </span>
+            <h3>Select Classes (Automatic Student Fetch)</h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setGeneratedAllocations(null);
+                setSelectedClasses([...CLASSES]);
+              }}
+              className="text-xs font-semibold text-indigo-600 hover:underline"
+            >
+              Select All
+            </button>
+            <span className="text-slate-300">|</span>
+            <button
+              type="button"
+              onClick={() => {
+                setGeneratedAllocations(null);
+                setSelectedClasses([]);
+              }}
+              className="text-xs font-semibold text-slate-500 hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Class Multi-Select Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2.5">
+          {CLASSES.map((cls) => {
+            const count = students.filter((s) => Number(s.class) === cls).length;
+            const isSelected = selectedClasses.includes(cls);
+            return (
+              <button
+                key={cls}
+                type="button"
+                onClick={() => toggleClass(cls)}
+                className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-300'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-bold">Class {cls}</span>
+                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                </div>
+                <span
+                  className={`text-[11px] mt-1 font-medium ${
+                    isSelected ? 'text-indigo-100' : 'text-slate-500'
+                  }`}
+                >
+                  {count} students
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Fetched Students Preview & Exclusion List */}
+        {selectedClasses.length > 0 && (
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-bold text-slate-800">
+                  Fetched Students: {fetchedStudents.length}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                  Included: {activeStudents.length}
+                </span>
+                {excludedStudentIds.size > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+                    Excluded: {excludedStudentIds.size}
+                  </span>
+                )}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={studentFilterText}
+                  onChange={(e) => setStudentFilterText(e.target.value)}
+                  placeholder="Filter fetched students..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {fetchedStudents.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-500">
+                No students exist in the Student Database for the selected class(es).
+              </div>
+            ) : (
+              <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                {displayedFetchedStudents.map((st) => {
+                  const isExcluded = excludedStudentIds.has(st.id);
+                  return (
+                    <div
+                      key={st.id}
+                      onClick={() => toggleExcludeStudent(st.id)}
+                      className={`px-4 py-2.5 flex items-center justify-between cursor-pointer transition text-sm ${
+                        isExcluded ? 'bg-rose-50/50 opacity-60' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={!isExcluded}
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span
+                          className={`font-medium ${
+                            isExcluded ? 'line-through text-slate-500' : 'text-slate-900'
+                          }`}
+                        >
+                          {st.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">
+                          Class {st.class}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-bold">
+                          Roll {st.roll}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Step 3: Examination Halls & 4 Seat Allocation Styles */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-slate-900 font-bold text-base">
+            <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs flex items-center justify-center font-extrabold">
+              3
+            </span>
+            <h3>Examination Halls, Benches & Seat Pattern</h3>
+          </div>
+
+          <button
+            type="button"
+            onClick={addHall}
+            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Another Hall
+          </button>
+        </div>
+
+        {/* 4 Seating Style Cards */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            Select Seat Allocation Pattern (আসন বিন্যাসের ধরন):
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              {
+                id: 'z-serial',
+                title: '1. Z-Style (Serial)',
+                badge: 'Zig-Zag • Roll 1,2,3',
+                desc: 'Bench 1 বামে Class A থাকলে Bench 2 ডানে Class A বসবে (ক্রমিক রোল)।'
+              },
+              {
+                id: 'l-serial',
+                title: '2. L-Style (Serial)',
+                badge: 'Linear • Roll 1,2,3',
+                desc: 'কলামের একপাশে এক ক্লাস এবং অন্যপাশে ভিন্ন ক্লাস বসবে (ক্রমিক রোল)।'
+              },
+              {
+                id: 'z-mix',
+                title: '3. Z-Style (Roll Mix)',
+                badge: 'Zig-Zag • Random Roll',
+                desc: 'Z প্যাটার্নে ক্লাস বসবে, তবে রোল নম্বরগুলো এলোমেলো (Mix) থাকবে।'
+              },
+              {
+                id: 'l-mix',
+                title: '4. L-Style (Roll Mix)',
+                badge: 'Linear • Random Roll',
+                desc: 'L প্যাটার্নে ক্লাস বসবে, তবে রোল নম্বরগুলো এলোমেলো (Mix) থাকবে।'
+              }
+            ].map((opt) => {
+              const active = allocationStrategy === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setGeneratedAllocations(null);
+                    setAllocationStrategy(opt.id);
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    active
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-300'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs">{opt.title}</span>
+                      {opt.id.endsWith('-mix') && (
+                        <Shuffle className={`w-3.5 h-3.5 ${active ? 'text-indigo-200' : 'text-indigo-600'}`} />
+                      )}
+                    </div>
+                    <span
+                      className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+                        active ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-700 border border-indigo-100'
+                      }`}
+                    >
+                      {opt.badge}
+                    </span>
+                  </div>
+                  <p className={`text-[11px] mt-2 leading-relaxed ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
+                    {opt.desc}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Halls Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {halls.map((hall, idx) => {
+            const colBenches = getHallColumnBenches(hall);
+            const totalBenches = colBenches.reduce((a, b) => a + b, 0);
+            const seatsPerBench = Math.min(3, Math.max(1, Number(hall.seats_per_bench || 1)));
+            const cap = totalBenches * seatsPerBench;
+
+            return (
+              <div
+                key={hall.id}
+                className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
+                    Hall #{idx + 1} • {totalBenches} Benches • {cap} Seats
+                  </span>
+                  {halls.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeHall(hall.id)}
+                      className="text-rose-500 hover:text-rose-700 p-1"
+                      title="Remove Hall"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Hall Number, Total Columns & Students per Bench (1, 2, or 3) */}
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Hall Number
+                    </label>
+                    <input
+                      type="text"
+                      value={hall.hall_number}
+                      onChange={(e) => updateHall(hall.id, 'hall_number', e.target.value)}
+                      className="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Total Columns
+                    </label>
+                    <select
+                      value={colBenches.length}
+                      onChange={(e) => updateHallColumnCount(hall.id, e.target.value)}
+                      className="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((c) => (
+                        <option key={c} value={c}>
+                          {c} {c === 1 ? 'Column' : 'Columns'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Seats / Bench
+                    </label>
+                    <select
+                      value={seatsPerBench}
+                      onChange={(e) => updateHall(hall.id, 'seats_per_bench', Number(e.target.value))}
+                      className="w-full px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-indigo-700"
+                    >
+                      <option value={1}>1 Student</option>
+                      <option value={2}>2 Students</option>
+                      <option value={3}>3 Students</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Per-Column Bench Count Inputs */}
+                <div className="pt-2 border-t border-slate-200/80">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-2">
+                    Benches per Column (আলাদা কলামে বেঞ্চ সংখ্যা):
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {colBenches.map((bCount, cIdx) => (
+                      <div
+                        key={cIdx}
+                        className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-300"
+                      >
+                        <span className="text-xs font-semibold text-slate-600">
+                          Col {cIdx + 1}:
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={30}
+                          value={bCount}
+                          onChange={(e) => updateHallColumnBench(hall.id, cIdx, e.target.value)}
+                          className="w-14 text-right font-bold text-sm text-indigo-700 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Generate Button */}
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
+          <p className="text-xs text-slate-500">
+            Ready to allocate <strong>{activeStudents.length}</strong> students into{' '}
+            <strong>{totalSeatCapacity}</strong> available seats.
+          </p>
+          <button
+            type="button"
+            onClick={handleGenerateSeatPlan}
+            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition"
+          >
+            <Sparkles className="w-4 h-4" />
+            Generate Seat Plan Preview
+          </button>
+        </div>
+      </div>
+
+      {/* Step 4: Interactive Seat Plan Preview & Finalize */}
+      {generatedAllocations && (
+        <div className="bg-white p-6 rounded-2xl border-2 border-indigo-500 shadow-lg space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Draft Seat Plan Ready ({allocationStrategy.toUpperCase()})
+              </span>
+              <h3 className="text-xl font-bold text-slate-900">
+                Visual Hall Allocation ({generatedAllocations.length} Students Allocated)
+              </h3>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleGenerateSeatPlan}
+                className="px-4 py-3 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition"
+              >
+                <Shuffle className="w-4 h-4 text-indigo-600" />
+                Re-Generate
+              </button>
+
+              <button
+                type="button"
+                onClick={handleFinalizeAndSave}
+                disabled={finalizing}
+                className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md flex items-center gap-2 transition"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {finalizing ? 'Saving Permanently...' : 'Finalize & Open PDF Generator'}
+              </button>
+            </div>
+          </div>
+
+          {/* Hall Switcher Tabs */}
+          {halls.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {halls.map((h) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => setPreviewHallId(h.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition ${
+                    previewHallId === h.id
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Hall {h.hall_number}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Column-by-Column Bench Grid for Selected Hall */}
+          {(() => {
+            const activeHall = halls.find((h) => h.id === previewHallId) || halls[0];
+            if (!activeHall) return null;
+            const hallAllocs = generatedAllocations.filter((a) => a.hall_id === activeHall.id);
+            const colBenches = getHallColumnBenches(activeHall);
+            const seatsPerBench = Math.min(3, Math.max(1, Number(activeHall.seats_per_bench || 1)));
+
+            return (
+              <div className="overflow-x-auto pb-2">
+                <div
+                  className="min-w-[640px] grid gap-4 items-start"
+                  style={{
+                    gridTemplateColumns: `repeat(${colBenches.length}, minmax(260px, 1fr))`
+                  }}
+                >
+                  {colBenches.map((benchCount, colIdx) => {
+                    const colNum = colIdx + 1;
+                    const benchesArr = Array.from({ length: benchCount }, (_, i) => i + 1);
+
+                    return (
+                      <div
+                        key={colNum}
+                        className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
+                          <span>Column {colNum}</span>
+                          <span className="text-indigo-300">{benchCount} Benches</span>
+                        </div>
+
+                        {benchesArr.length === 0 ? (
+                          <div className="text-xs text-slate-400 italic py-6 text-center">
+                            0 Benches in this column
+                          </div>
+                        ) : (
+                          benchesArr.map((rowInCol) => {
+                            const benchSeats = hallAllocs
+                              .filter(
+                                (a) =>
+                                  (a.column_number || 1) === colNum &&
+                                  (a.col_bench_number || a.row_number) === rowInCol
+                              )
+                              .sort((a, b) => (a.seat_index || 1) - (b.seat_index || 1));
+                            const overallBenchNum = benchSeats[0]?.bench_number;
+
+                            return (
+                              <div
+                                key={rowInCol}
+                                className="p-2.5 rounded-xl border border-slate-200 bg-white shadow-2xs"
+                              >
+                                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                                  <span>
+                                    Col {colNum} • Bench {rowInCol}
+                                  </span>
+                                  {overallBenchNum && (
+                                    <span className="text-indigo-600">
+                                      Hall Bench #{overallBenchNum}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {benchSeats.length === 0 ? (
+                                  <div className="text-xs text-slate-400 italic py-2 text-center bg-slate-50 rounded-lg">
+                                    Empty Bench
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="grid gap-1.5"
+                                    style={{
+                                      gridTemplateColumns: `repeat(${seatsPerBench}, minmax(0, 1fr))`
+                                    }}
+                                  >
+                                    {benchSeats.map((seat, sIdx) => {
+                                      const clsBadge =
+                                        CLASS_BADGE_COLORS[Number(seat.student_class_snapshot)] ||
+                                        'bg-indigo-50 text-indigo-700 border-indigo-200';
+                                      return (
+                                        <div
+                                          key={sIdx}
+                                          className={`p-2 rounded-lg border ${clsBadge}`}
+                                        >
+                                          <div className="flex items-center justify-between text-[9px] font-extrabold uppercase opacity-75 mb-0.5">
+                                            <span>{seat.seat_position}</span>
+                                            <span>C-{seat.student_class_snapshot}</span>
+                                          </div>
+                                          <div className="font-bold text-[11px] text-slate-900 truncate" title={seat.student_name_snapshot}>
+                                            {seat.student_name_snapshot}
+                                          </div>
+                                          <div className="text-[11px] font-mono font-extrabold text-slate-800 mt-0.5">
+                                            Roll: {seat.student_roll_snapshot}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 7. EXAMINATION HISTORY VIEW (PERMANENT SNAPSHOTS, SEARCH, FILTER, PDF REPRINT)
+// ============================================================================
+function ExaminationHistoryView({ examinations, onOpenPdfPreview }) {
+  const [searchExam, setSearchExam] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [expandedExamId, setExpandedExamId] = useState(null);
+
+  const filteredExams = useMemo(() => {
+    return examinations.filter((ex) => {
+      if (filterDate && ex.exam_date !== filterDate) return false;
+      if (searchExam.trim()) {
+        const q = searchExam.toLowerCase();
+        return (
+          (ex.exam_name || '').toLowerCase().includes(q) ||
+          (ex.shift_name || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [examinations, searchExam, filterDate]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Examination History</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Permanently archived seat plans with preserved student snapshots. Re-preview or download PDFs anytime.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchExam}
+              onChange={(e) => setSearchExam(e.target.value)}
+              placeholder="Search examination name..."
+              className="pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="px-3 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {filterDate && (
+              <button
+                onClick={() => setFilterDate('')}
+                className="px-2.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {filteredExams.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
+          <History className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No Finalized Examinations Found</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Create and finalize an examination seat plan to archive it permanently here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredExams.map((exam) => {
+            const totalStudents = (exam.allocations || []).length;
+            const totalHalls = (exam.halls || []).length;
+            const isExpanded = expandedExamId === exam.id;
+
+            return (
+              <div
+                key={exam.id}
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+              >
+                <div className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                        FINALIZED SNAPSHOT
+                      </span>
+                      {exam.allocation_strategy && (
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-semibold uppercase">
+                          {exam.allocation_strategy}
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">
+                        Saved: {new Date(exam.finalized_at || exam.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">{exam.exam_name}</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                        {exam.exam_date}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                        {exam.shift_name}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                        {totalHalls} Hall(s)
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                        <Users className="w-3.5 h-3.5 text-indigo-600" />
+                        {totalStudents} Students
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      onClick={() => setExpandedExamId(isExpanded ? null : exam.id)}
+                      className="px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition"
+                    >
+                      <Layers className="w-4 h-4 text-slate-500" />
+                      {isExpanded ? 'Hide Hall Breakdown' : 'Inspect Halls'}
+                    </button>
+
+                    <button
+                      onClick={() => onOpenPdfPreview(exam)}
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Preview & Download PDFs
+                    </button>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="p-5 bg-slate-50 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {(exam.halls || []).map((h) => {
+                      const hallStudents = (exam.allocations || []).filter(
+                        (a) => a.hall_id === h.id || a.hall_number === h.hall_number
+                      );
+                      const classesInHall = [
+                        ...new Set(hallStudents.map((s) => s.student_class_snapshot))
+                      ].sort((a, b) => a - b);
+
+                      return (
+                        <div
+                          key={h.id}
+                          className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-sm text-slate-900">
+                                Hall {h.hall_number}
+                              </span>
+                              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                {hallStudents.length} Students
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              Layout:{' '}
+                              {Array.isArray(h.column_benches)
+                                ? `${h.column_benches.length} Columns (${h.column_benches.join(' + ')} Benches)`
+                                : `${h.total_rows} Rows × ${h.benches_per_row} Benches`}{' '}
+                              ({h.seats_per_bench || 1} seat/bench)
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1.5">
+                              Classes:{' '}
+                              {classesInHall.length > 0
+                                ? classesInHall.map((c) => `Class ${c}`).join(', ')
+                                : 'None'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => onOpenPdfPreview({ ...exam, _initialHallFilter: h.hall_number })}
+                            className="mt-3 w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Open Hall {h.hall_number} PDF
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 8. PDF PREVIEW & MULTI-FORMAT DOWNLOAD MODAL (PORTRAIT/LANDSCAPE, EN/BN)
+// ============================================================================
+function PdfPreviewAndExportModal({ exam, institution, onClose, showToast }) {
+  const [pdfMode, setPdfMode] = useState(exam._initialHallFilter ? 'hall' : 'complete');
+  const [selectedHallNum, setSelectedHallNum] = useState(
+    exam._initialHallFilter || exam.halls?.[0]?.hall_number || ''
+  );
+
+  const [orientation, setOrientation] = useState(institution.default_orientation || 'portrait');
+  const [lang, setLang] = useState(institution.default_language || 'en');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const t = LABELS[lang];
+  const allocations = exam.allocations || [];
+  const halls = exam.halls || [];
+
+  const pages = useMemo(() => {
+    const builtPages = [];
+    const sortHallRows = (a, b) =>
+      (a.column_number || 1) - (b.column_number || 1) ||
+      a.bench_number - b.bench_number ||
+      (a.seat_index || 1) - (b.seat_index || 1);
+
+    if (pdfMode === 'hall') {
+      const targetHall = halls.find((h) => String(h.hall_number) === String(selectedHallNum)) || halls[0];
+      if (targetHall) {
+        const hallStudents = allocations
+          .filter((a) => String(a.hall_number) === String(targetHall.hall_number))
+          .sort(sortHallRows);
+
+        const perPage = orientation === 'portrait' ? 24 : 15;
+        const chunks = [];
+        for (let i = 0; i < Math.max(1, hallStudents.length); i += perPage) {
+          chunks.push(hallStudents.slice(i, i + perPage));
+        }
+
+        chunks.forEach((chunk, idx) => {
+          builtPages.push({
+            title: t.hallWiseTitle,
+            hallNumber: targetHall.hall_number,
+            hallTotalCount: hallStudents.length,
+            rows: chunk,
+            type: 'hall',
+            subPage: idx + 1,
+            subTotal: chunks.length
+          });
+        });
+      }
+    } else if (pdfMode === 'complete') {
+      halls.forEach((h) => {
+        const hallStudents = allocations
+          .filter((a) => String(a.hall_number) === String(h.hall_number))
+          .sort(sortHallRows);
+
+        const perPage = orientation === 'portrait' ? 24 : 15;
+        const chunks = [];
+        for (let i = 0; i < Math.max(1, hallStudents.length); i += perPage) {
+          chunks.push(hallStudents.slice(i, i + perPage));
+        }
+
+        chunks.forEach((chunk) => {
+          builtPages.push({
+            title: t.completeTitle,
+            hallNumber: h.hall_number,
+            hallTotalCount: hallStudents.length,
+            rows: chunk,
+            type: 'hall'
+          });
+        });
+      });
+    } else if (pdfMode === 'student') {
+      const sortedStudents = [...allocations].sort((a, b) => {
+        if (Number(a.student_class_snapshot) !== Number(b.student_class_snapshot)) {
+          return Number(a.student_class_snapshot) - Number(b.student_class_snapshot);
+        }
+        return Number(a.student_roll_snapshot) - Number(b.student_roll_snapshot);
+      });
+
+      const perPage = orientation === 'portrait' ? 25 : 16;
+      for (let i = 0; i < Math.max(1, sortedStudents.length); i += perPage) {
+        builtPages.push({
+          title: t.studentWiseTitle,
+          hallNumber: null,
+          hallTotalCount: sortedStudents.length,
+          rows: sortedStudents.slice(i, i + perPage),
+          type: 'student',
+          startIndex: i
+        });
+      }
+    }
+
+    return builtPages;
+  }, [pdfMode, selectedHallNum, halls, allocations, orientation, t]);
+
+  const handleDownloadRealPdf = async (overrideMode = null) => {
+    if (overrideMode && overrideMode !== pdfMode) {
+      setPdfMode(overrideMode);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    if (!window.html2canvas || !window.jspdf) {
+      showToast('PDF engine loading, using system Print-to-PDF fallback...', 'error');
+      window.print();
+      return;
+    }
+
+    setDownloadingPdf(true);
+    try {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: orientation === 'landscape' ? 'l' : 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageElements = document.querySelectorAll('.pdf-page-sheet');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < pageElements.length; i++) {
+        if (i > 0) pdf.addPage();
+        const canvas = await window.html2canvas(pageElements[i], {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      const activeMode = overrideMode || pdfMode;
+      const suffix =
+        activeMode === 'hall'
+          ? `Hall_${selectedHallNum}`
+          : activeMode === 'complete'
+          ? 'Complete_Seat_Plan'
+          : 'Student_Wise_List';
+      const cleanExamName = (exam.exam_name || 'Exam').replace(/[^a-zA-Z0-9_-]/g, '_');
+      pdf.save(`${cleanExamName}_${suffix}.pdf`);
+      showToast(`Downloaded ${suffix}.pdf (${orientation.toUpperCase()})`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      showToast('Could not generate direct PDF file. Opening print dialog instead.', 'error');
+      window.print();
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const instDisplayName =
+    lang === 'bn' && institution.institution_name_bn
+      ? institution.institution_name_bn
+      : institution.institution_name;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex flex-col">
+      {/* Top Toolbar */}
+      <div className="bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-bold text-sm sm:text-base leading-tight">
+              PDF Preview & Download Center
+            </h3>
+            <p className="text-xs text-slate-400">
+              {exam.exam_name} • {allocations.length} Allocated Students
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl bg-slate-800 p-1 text-xs font-semibold">
+            <button
+              onClick={() => setPdfMode('hall')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                pdfMode === 'hall' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              A. Hall-wise
+            </button>
+            <button
+              onClick={() => setPdfMode('complete')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                pdfMode === 'complete' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              B. Complete
+            </button>
+            <button
+              onClick={() => setPdfMode('student')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                pdfMode === 'student' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              C. Student-wise
+            </button>
+          </div>
+
+          {pdfMode === 'hall' && halls.length > 0 && (
+            <select
+              value={selectedHallNum}
+              onChange={(e) => setSelectedHallNum(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white outline-none"
+            >
+              {halls.map((h) => (
+                <option key={h.id} value={h.hall_number}>
+                  Hall {h.hall_number}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex rounded-xl bg-slate-800 p-1 text-xs font-semibold">
+            <button
+              onClick={() => setOrientation('portrait')}
+              className={`px-2.5 py-1.5 rounded-lg transition ${
+                orientation === 'portrait' ? 'bg-slate-600 text-white' : 'text-slate-400'
+              }`}
+            >
+              Portrait
+            </button>
+            <button
+              onClick={() => setOrientation('landscape')}
+              className={`px-2.5 py-1.5 rounded-lg transition ${
+                orientation === 'landscape' ? 'bg-slate-600 text-white' : 'text-slate-400'
+              }`}
+            >
+              Landscape
+            </button>
+          </div>
+
+          <div className="flex rounded-xl bg-slate-800 p-1 text-xs font-semibold">
+            <button
+              onClick={() => setLang('en')}
+              className={`px-2.5 py-1.5 rounded-lg transition ${
+                lang === 'en' ? 'bg-emerald-600 text-white' : 'text-slate-400'
+              }`}
+            >
+              English
+            </button>
+            <button
+              onClick={() => setLang('bn')}
+              className={`px-2.5 py-1.5 rounded-lg transition ${
+                lang === 'bn' ? 'bg-emerald-600 text-white' : 'text-slate-400'
+              }`}
+            >
+              বাংলা
+            </button>
+          </div>
+
+          <button
+            onClick={() => handleDownloadRealPdf()}
+            disabled={downloadingPdf}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg transition disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {downloadingPdf ? 'Generating PDF...' : 'Download PDF'}
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5"
+            title="Print A4 Pages"
+          >
+            <Printer className="w-4 h-4" />
+            Print
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Download Bar for All 3 Required PDF Formats */}
+      <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-center gap-3 text-xs">
+        <span className="text-slate-400 font-medium">Direct Format Downloads:</span>
+        <button
+          onClick={() => handleDownloadRealPdf('hall')}
+          disabled={downloadingPdf}
+          className="text-indigo-300 hover:text-white underline font-semibold"
+        >
+          1. Hall-wise PDF (Hall {selectedHallNum})
+        </button>
+        <span className="text-slate-600">•</span>
+        <button
+          onClick={() => handleDownloadRealPdf('complete')}
+          disabled={downloadingPdf}
+          className="text-indigo-300 hover:text-white underline font-semibold"
+        >
+          2. Complete Seat Plan PDF (All {halls.length} Halls)
+        </button>
+        <span className="text-slate-600">•</span>
+        <button
+          onClick={() => handleDownloadRealPdf('student')}
+          disabled={downloadingPdf}
+          className="text-indigo-300 hover:text-white underline font-semibold"
+        >
+          3. Student-wise List PDF (Sorted Class & Roll)
+        </button>
+      </div>
+
+      {/* Scrollable A4 Paper Preview Area */}
+      <div
+        id="printable-pdf-area"
+        className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col items-center gap-8 bg-slate-800/60"
+      >
+        {pages.map((page, pageIdx) => (
+          <div
+            key={pageIdx}
+            className="pdf-page-sheet bg-white text-slate-900 shadow-2xl flex flex-col justify-between shrink-0"
+            style={{
+              width: orientation === 'portrait' ? '210mm' : '297mm',
+              minHeight: orientation === 'portrait' ? '297mm' : '210mm',
+              padding: '14mm 16mm',
+              fontFamily: "'Noto Sans Bengali', 'Inter', sans-serif"
+            }}
+          >
+            {/* PDF Header */}
+            <div>
+              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {institution.institution_logo ? (
+                    <img
+                      src={institution.institution_logo}
+                      alt="Institution Logo"
+                      className="w-14 h-14 object-contain"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl border-2 border-slate-900 flex items-center justify-center font-extrabold text-xl">
+                      <School className="w-8 h-8 text-slate-900" />
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                      {instDisplayName}
+                    </h1>
+                    {institution.institution_address && (
+                      <p className="text-xs text-slate-600">{institution.institution_address}</p>
+                    )}
+                    <div className="inline-block mt-1 px-2.5 py-0.5 bg-slate-900 text-white text-xs font-bold tracking-wider uppercase">
+                      {page.title}
+                    </div>
+                  </div>
+                </div>
+
+                {page.hallNumber && (
+                  <div className="border-2 border-slate-900 px-4 py-2 text-center rounded-lg">
+                    <div className="text-[11px] font-bold uppercase text-slate-600">{t.hallNo}</div>
+                    <div className="text-2xl font-black text-slate-900 leading-none mt-0.5">
+                      {formatNum(page.hallNumber, lang)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Examination Metadata Grid */}
+              <div className="grid grid-cols-3 gap-3 bg-slate-100 border border-slate-300 rounded-lg px-4 py-2.5 mb-4 text-xs">
+                <div>
+                  <span className="font-bold text-slate-600">{t.examName}: </span>
+                  <span className="font-extrabold text-slate-900">{exam.exam_name}</span>
+                </div>
+                <div className="text-center">
+                  <span className="font-bold text-slate-600">{t.examDate}: </span>
+                  <span className="font-extrabold text-slate-900">
+                    {formatNum(exam.exam_date, lang)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-slate-600">{t.shift}: </span>
+                  <span className="font-extrabold text-slate-900">{exam.shift_name}</span>
+                </div>
+              </div>
+
+              {/* Allocation Table */}
+              {page.type === 'hall' ? (
+                <table className="w-full border-collapse border border-slate-800 text-xs">
+                  <thead>
+                    <tr className="bg-slate-200 text-slate-900 font-bold">
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.colNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-14">
+                        {t.rowNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.benchNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.seatPos}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-3 text-left">
+                        {t.studentName}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-20">
+                        {t.classLabel}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-20">
+                        {t.rollNo}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {page.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="border border-slate-800 py-6 text-center text-slate-500">
+                          No students allocated in this hall.
+                        </td>
+                      </tr>
+                    ) : (
+                      page.rows.map((row, rIdx) => (
+                        <tr key={rIdx} className={rIdx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                            {formatNum(row.column_number || 1, lang)}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                            {formatNum(row.row_number, lang)}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                            {formatNum(row.bench_number, lang)}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center text-slate-600 font-semibold">
+                            {formatSeatPos(row.seat_position, lang)}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-3 font-semibold text-slate-900">
+                            {row.student_name_snapshot}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center font-semibold">
+                            {formatNum(row.student_class_snapshot, lang)}
+                          </td>
+                          <td className="border border-slate-800 py-1.5 px-2 text-center font-extrabold">
+                            {formatNum(row.student_roll_snapshot, lang)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                /* Student-wise Allocation Table (Sorted by Class & Roll) */
+                <table className="w-full border-collapse border border-slate-800 text-xs">
+                  <thead>
+                    <tr className="bg-slate-200 text-slate-900 font-bold">
+                      <th className="border border-slate-800 py-2 px-2 text-center w-12">{t.sl}</th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.classLabel}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.rollNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-3 text-left">
+                        {t.studentName}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-20">
+                        {t.hallNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.colNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.benchNo}
+                      </th>
+                      <th className="border border-slate-800 py-2 px-2 text-center w-16">
+                        {t.seatPos}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {page.rows.map((row, rIdx) => (
+                      <tr key={rIdx} className={rIdx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center">
+                          {formatNum((page.startIndex || 0) + rIdx + 1, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                          {formatNum(row.student_class_snapshot, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center font-extrabold">
+                          {formatNum(row.student_roll_snapshot, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-3 font-semibold">
+                          {row.student_name_snapshot}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center font-extrabold">
+                          {formatNum(row.hall_number, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                          {formatNum(row.column_number || 1, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center font-bold">
+                          {formatNum(row.bench_number, lang)}
+                        </td>
+                        <td className="border border-slate-800 py-1.5 px-2 text-center text-slate-700 font-semibold">
+                          {formatSeatPos(row.seat_position, lang)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* PDF Footer */}
+            <div className="mt-6 pt-3 border-t border-slate-300">
+              <div className="flex items-end justify-between mb-3">
+                <div className="text-xs font-bold text-slate-800 space-y-1">
+                  {page.hallNumber && (
+                    <div>
+                      {t.hallTotal}: {formatNum(page.hallTotalCount, lang)}
+                    </div>
+                  )}
+                  <div>
+                    {t.totalAllocated}: {formatNum(allocations.length, lang)}
+                  </div>
+                </div>
+
+                <div className="text-center min-w-[200px]">
+                  <div className="h-10" />
+                  <div className="border-t border-slate-900 pt-1 text-xs font-bold text-slate-900">
+                    {institution.authorized_teacher_name || t.authorizedSignature}
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    {institution.authorized_designation || t.controllerOfExams}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-200 pt-2">
+                <span>
+                  {t.generatedOn}: {formatNum(new Date().toLocaleDateString(), lang)}
+                </span>
+                <span className="font-bold text-slate-700">
+                  {t.page} {formatNum(pageIdx + 1, lang)} {t.of} {formatNum(pages.length, lang)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 9. INSTITUTION SETTINGS VIEW (NAME, BANGLA NAME, LOGO UPLOAD, SIGNATURE)
+// ============================================================================
+function InstitutionSettingsView({ institution, user, showToast }) {
+  const [form, setForm] = useState(institution);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm(institution);
+  }, [institution]);
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      showToast('Please upload a logo smaller than 500KB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((prev) => ({ ...prev, institution_logo: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setSaving(true);
+    try {
+      await setDoc(getDocRef('institution_settings', 'primary'), {
+        ...form,
+        updated_at: new Date().toISOString()
+      });
+      showToast('Institution & PDF print settings saved permanently!');
+    } catch (err) {
+      console.error('Save settings error:', err);
+      showToast('Failed to save settings.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Institution & PDF Settings</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          Configure official header branding, logo, and authorized teacher signature block for generated seat plan PDFs.
+        </p>
+      </div>
+
+      <form
+        onSubmit={handleSaveSettings}
+        className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Institution Name (English) *
+            </label>
+            <input
+              type="text"
+              required
+              value={form.institution_name || ''}
+              onChange={(e) => setForm({ ...form, institution_name: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              প্রতিষ্ঠানের নাম (বাংলা)
+            </label>
+            <input
+              type="text"
+              value={form.institution_name_bn || ''}
+              onChange={(e) => setForm({ ...form, institution_name_bn: e.target.value })}
+              placeholder="সেন্ট জেভিয়ার আদর্শ উচ্চ বিদ্যালয়"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Institution Address
+          </label>
+          <input
+            type="text"
+            value={form.institution_address || ''}
+            onChange={(e) => setForm({ ...form, institution_address: e.target.value })}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        {/* Logo Upload */}
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {form.institution_logo ? (
+              <img
+                src={form.institution_logo}
+                alt="Preview"
+                className="w-16 h-16 rounded-xl object-contain bg-white border border-slate-200 p-1"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                <School className="w-8 h-8" />
+              </div>
+            )}
+            <div>
+              <div className="text-sm font-bold text-slate-800">Institution Logo</div>
+              <p className="text-xs text-slate-500">Appears on the top-left of every generated PDF.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer">
+              Upload Logo
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </label>
+            {form.institution_logo && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, institution_logo: '' })}
+                className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Authorized Teacher Signature */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Authorized Teacher Name
+            </label>
+            <input
+              type="text"
+              value={form.authorized_teacher_name || ''}
+              onChange={(e) => setForm({ ...form, authorized_teacher_name: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Designation / Title
+            </label>
+            <input
+              type="text"
+              value={form.authorized_designation || ''}
+              onChange={(e) => setForm({ ...form, authorized_designation: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Default PDF Preferences */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Default PDF Language
+            </label>
+            <select
+              value={form.default_language || 'en'}
+              onChange={(e) => setForm({ ...form, default_language: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm outline-none"
+            >
+              <option value="en">English</option>
+              <option value="bn">Bangla (বাংলা)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Default Page Orientation
+            </label>
+            <select
+              value={form.default_orientation || 'portrait'}
+              onChange={(e) => setForm({ ...form, default_orientation: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm outline-none"
+            >
+              <option value="portrait">A4 Portrait</option>
+              <option value="landscape">A4 Landscape</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="pt-2 flex justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-md disabled:opacity-50"
+          >
+            {saving ? 'Saving Settings...' : 'Save Institution Settings'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+```
