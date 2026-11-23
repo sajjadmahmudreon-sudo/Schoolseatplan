@@ -145,6 +145,7 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
 
     const cornerClasses = assignedClasses.length > 0 ? assignedClasses : allSelectedClassKeys;
     const middleClass = hall.middle_class ? Number(hall.middle_class) : null;
+    const middleFallbackClass = hall.middle_fallback_class ? Number(hall.middle_fallback_class) : null;
 
     let hallAllocatedCount = 0, hallCapacity = 0, benchCounter = 0;
     colBenches.forEach((bc) => { hallCapacity += totalRows * bc * seatsPerBench; });
@@ -166,48 +167,71 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
             let student = null;
             const isMiddleSeat = seatsPerBench === 3 && seatIdx === 1;
 
+            const pickWithNoAdjacentClass = (primaryCandidate, secondaryCandidate) => {
+              if (primaryCandidate && Number(primaryCandidate) !== Number(prevCls)) {
+                const s = popFromClass(primaryCandidate);
+                if (s) return s;
+              }
+              if (secondaryCandidate && Number(secondaryCandidate) !== Number(prevCls)) {
+                const s = popFromClass(secondaryCandidate);
+                if (s) return s;
+              }
+              const sCornerDiff = popFromList(cornerClasses, prevCls);
+              if (sCornerDiff) return sCornerDiff;
+              const sFallbackDiff = popFromList(fallbackClasses, prevCls);
+              if (sFallbackDiff) return sFallbackDiff;
+
+              if (primaryCandidate) {
+                const s = popFromClass(primaryCandidate);
+                if (s) return s;
+              }
+              return popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
+            };
+
             if (isMiddleSeat && middleClass) {
-              student =
-                popFromClass(middleClass) ||
-                popFromList(cornerClasses, prevCls) ||
-                popFromList(fallbackClasses, prevCls);
+              student = popFromClass(middleClass);
+              if (!student && middleFallbackClass && Number(middleFallbackClass) !== Number(prevCls)) {
+                student = popFromClass(middleFallbackClass);
+              }
+              if (!student) {
+                student = popFromList(cornerClasses, prevCls) || popFromList(fallbackClasses, prevCls);
+              }
+              if (!student && middleFallbackClass) {
+                student = popFromClass(middleFallbackClass);
+              }
+              if (!student) {
+                student = popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
+              }
             } else if (isLStyle) {
               if (seatsPerBench === 1) {
-                student =
-                  popFromClass(primaryClass) ||
-                  popFromList(cornerClasses, null) ||
-                  popFromList(fallbackClasses, null);
+                student = pickWithNoAdjacentClass(primaryClass, secondaryClass);
               } else if (seatsPerBench === 2) {
                 student = seatIdx === 0
-                  ? (popFromClass(primaryClass) || popFromList(cornerClasses, null) || popFromList(fallbackClasses, null))
-                  : (popFromClass(secondaryClass) || popFromList(cornerClasses, primaryClass) || popFromList(fallbackClasses, null));
+                  ? pickWithNoAdjacentClass(primaryClass, secondaryClass)
+                  : pickWithNoAdjacentClass(secondaryClass, primaryClass);
               } else {
                 if (seatIdx === 0) {
-                  student = popFromClass(primaryClass) || popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
+                  student = pickWithNoAdjacentClass(primaryClass, secondaryClass);
                 } else if (seatIdx === 1) {
-                  student = popFromList(cornerClasses, primaryClass) || popFromList(fallbackClasses, null);
+                  student = popFromList(cornerClasses, prevCls) || popFromList(fallbackClasses, prevCls) || popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
                 } else {
-                  student = popFromClass(secondaryClass) || popFromList(cornerClasses, primaryClass) || popFromList(fallbackClasses, null);
+                  student = pickWithNoAdjacentClass(secondaryClass, primaryClass);
                 }
               }
             } else {
               const cornerPool = cornerClasses;
               const n = cornerPool.length;
               if (seatsPerBench === 1) {
-                student = popFromList(cornerPool, prevCls) || popFromList(fallbackClasses, prevCls);
+                student = popFromList(cornerPool, prevCls) || popFromList(fallbackClasses, prevCls) || popFromList(cornerPool, null) || popFromList(fallbackClasses, null);
               } else if (seatsPerBench === 3 && middleClass) {
-                const wantedCorner = cornerPool[(bInCol - 1 + (seatIdx === 2 ? 1 : 0) + rrCornerIdx) % n];
-                student =
-                  popFromClass(wantedCorner) ||
-                  popFromList(cornerPool, prevCls) ||
-                  popFromList(fallbackClasses, prevCls);
+                const wantedCorner = n ? cornerPool[(bInCol - 1 + (seatIdx === 2 ? 1 : 0) + rrCornerIdx) % n] : null;
+                const otherCorner = n ? cornerPool[(bInCol - 1 + (seatIdx === 2 ? 0 : 1) + rrCornerIdx) % n] : null;
+                student = pickWithNoAdjacentClass(wantedCorner, otherCorner);
                 if (student) rrCornerIdx += 1;
               } else {
                 const wanted = n ? cornerPool[((bInCol - 1) + seatIdx) % n] : null;
-                student =
-                  (wanted ? popFromClass(wanted) : null) ||
-                  popFromList(cornerPool, prevCls) ||
-                  popFromList(fallbackClasses, prevCls);
+                const alt = n ? cornerPool[((bInCol - 1) + seatIdx + 1) % n] : null;
+                student = pickWithNoAdjacentClass(wanted, alt);
               }
             }
 
@@ -254,6 +278,7 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
       assigned_classes: assignedClasses,
       fallback_classes: fallbackClasses,
       middle_class: middleClass,
+      middle_fallback_class: middleFallbackClass,
       class_breakdown: classBreakdown,
       capacity: hallCapacity,
       allocated_count: hallAllocatedCount
@@ -579,7 +604,8 @@ function App() {
       seats_per_bench: 2,
       assigned_classes: [1, 5],
       fallback_classes: [2, 3, 4],
-      middle_class: ''
+      middle_class: '',
+      middle_fallback_class: ''
     },
     {
       id: 'h-2',
@@ -590,7 +616,8 @@ function App() {
       seats_per_bench: 2,
       assigned_classes: [2, 4],
       fallback_classes: [1, 3, 5],
-      middle_class: ''
+      middle_class: '',
+      middle_fallback_class: ''
     }
   ]);
   const [generatedPlan, setGeneratedPlan] = useState(null);
@@ -733,7 +760,8 @@ function App() {
       seats_per_bench: 2,
       assigned_classes: [...selectedClasses],
       fallback_classes: [],
-      middle_class: ''
+      middle_class: '',
+      middle_fallback_class: ''
     }]);
     setGeneratedPlan(null);
   };
@@ -1090,7 +1118,7 @@ function App() {
                 <div>
                   <h3 className="font-bold text-slate-800">Hall-wise Class Selection, Columns, Benches & 3-Seat Middle Class</h3>
                   <p className="text-xs text-slate-500">
-                    Pick primary classes per hall (e.g., Hall 1: Class 1 & 5), set 3rd-choice classes, configure column bench counts, and assign a fixed class for the middle seat on 3-seat benches.
+                    Pick primary classes per hall, set 3rd-choice classes, configure column bench counts, and set primary + overflow classes for middle seats on 3-seat benches.
                   </p>
                 </div>
                 <button type="button" onClick={addHall} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900">+ Add Hall</button>
@@ -1120,14 +1148,24 @@ function App() {
                         </select>
                       </div>
                       {Number(hall.seats_per_bench) === 3 && (
-                        <div className="w-44">
-                          <label className="block text-[11px] font-semibold text-blue-700 mb-1">Middle Seat Class (3-Seat)</label>
-                          <select value={hall.middle_class || ''} onChange={(e) => updateHallField(hIdx, 'middle_class', e.target.value)}
-                            className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg bg-blue-50 text-sm font-semibold text-blue-900">
-                            <option value="">Auto / Zig-Zag</option>
-                            {selectedClasses.map((c) => <option key={c} value={c}>Class {c} (Middle Only)</option>)}
-                          </select>
-                        </div>
+                        <>
+                          <div className="w-44">
+                            <label className="block text-[11px] font-semibold text-blue-700 mb-1">Middle Seat Class (3-Seat)</label>
+                            <select value={hall.middle_class || ''} onChange={(e) => updateHallField(hIdx, 'middle_class', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg bg-blue-50 text-sm font-semibold text-blue-900">
+                              <option value="">Auto / Zig-Zag</option>
+                              {selectedClasses.map((c) => <option key={c} value={c}>Class {c} (Middle Only)</option>)}
+                            </select>
+                          </div>
+                          <div className="w-48">
+                            <label className="block text-[11px] font-semibold text-indigo-700 mb-1">Middle Overflow / Next Class</label>
+                            <select value={hall.middle_fallback_class || ''} onChange={(e) => updateHallField(hIdx, 'middle_fallback_class', e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-indigo-300 rounded-lg bg-indigo-50 text-sm font-semibold text-indigo-900">
+                              <option value="">Auto (Corner / 3rd Choice)</option>
+                              {selectedClasses.map((c) => <option key={c} value={c}>Class {c} (When Middle Ends)</option>)}
+                            </select>
+                          </div>
+                        </>
                       )}
                       {hallsConfig.length > 1 && (
                         <button type="button" onClick={() => removeHall(hIdx)}
