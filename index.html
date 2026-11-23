@@ -177,8 +177,6 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
     colBenches.forEach((bc) => { hallCapacity += totalRows * bc * seatsPerBench; });
     const maxBenches = Math.max(...colBenches);
 
-    let rrCornerIdx = 0;
-
     for (let bInCol = 1; bInCol <= maxBenches; bInCol++) {
       for (let colIdx = 0; colIdx < colCount; colIdx++) {
         const rowNum = 1;
@@ -188,25 +186,31 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
         if (bInCol <= colBenches[colIdx]) {
           benchCounter += 1;
           let prevCls = null;
+          let leftCornerCls = null;
+          const isThree = seatsPerBench === 3;
 
           for (let seatIdx = 0; seatIdx < seatsPerBench; seatIdx++) {
             let student = null;
-            const isMiddleSeat = seatsPerBench === 3 && seatIdx === 1;
+            const isMiddleSeat = isThree && seatIdx === 1;
+            // For 3-seat benches the two corner seats behave exactly like a 2-seat bench (left = 0, right = 1)
+            const cornerPos = isThree ? (seatIdx === 2 ? 1 : 0) : seatIdx;
+            const cornerCount = isThree ? 2 : seatsPerBench;
+            // class we must not sit next to: for corners compare corner-to-corner, otherwise the previous seat
+            const adjCls = isThree ? (seatIdx === 2 ? leftCornerCls : null) : prevCls;
 
-            const pickWithNoAdjacentClass = (primaryCandidate, secondaryCandidate) => {
-              if (primaryCandidate && Number(primaryCandidate) !== Number(prevCls)) {
+            const pick = (primaryCandidate, secondaryCandidate) => {
+              if (primaryCandidate && Number(primaryCandidate) !== Number(adjCls)) {
                 const s = popFromClass(primaryCandidate);
                 if (s) return s;
               }
-              if (secondaryCandidate && Number(secondaryCandidate) !== Number(prevCls)) {
+              if (secondaryCandidate && Number(secondaryCandidate) !== Number(adjCls)) {
                 const s = popFromClass(secondaryCandidate);
                 if (s) return s;
               }
-              const sCornerDiff = popFromList(cornerClasses, prevCls);
+              const sCornerDiff = popFromList(cornerClasses, adjCls);
               if (sCornerDiff) return sCornerDiff;
-              const sFallbackDiff = popFromList(fallbackClasses, prevCls);
+              const sFallbackDiff = popFromList(fallbackClasses, adjCls);
               if (sFallbackDiff) return sFallbackDiff;
-
               if (primaryCandidate) {
                 const s = popFromClass(primaryCandidate);
                 if (s) return s;
@@ -214,71 +218,48 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
               return popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
             };
 
-            if (isMiddleSeat && orderedMiddleClasses.length > 0) {
-              for (const mc of orderedMiddleClasses) {
-                if (Number(mc) !== Number(prevCls)) {
-                  const s = popFromClass(mc);
-                  if (s) { student = s; break; }
-                }
-              }
-              if (!student) {
+            if (isMiddleSeat) {
+              // Middle seat: use the class(es) chosen for the middle, in the selected order
+              if (orderedMiddleClasses.length > 0) {
                 for (const mc of orderedMiddleClasses) {
-                  const s = popFromClass(mc);
-                  if (s) { student = s; break; }
+                  if (Number(mc) !== Number(prevCls)) {
+                    const s = popFromClass(mc);
+                    if (s) { student = s; break; }
+                  }
+                }
+                if (!student) {
+                  for (const mc of orderedMiddleClasses) {
+                    const s = popFromClass(mc);
+                    if (s) { student = s; break; }
+                  }
                 }
               }
               if (!student) {
-                student = popFromList(cornerClasses, prevCls) || popFromList(fallbackClasses, prevCls);
-              }
-              if (!student) {
-                student = popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
+                student = popFromList(fallbackClasses, prevCls) || popFromList(cornerClasses, prevCls)
+                  || popFromList(fallbackClasses, null) || popFromList(cornerClasses, null);
               }
             } else if (isLStyle) {
-              if (seatsPerBench === 1) {
-                student = pickWithNoAdjacentClass(primaryClass, secondaryClass);
-              } else if (seatsPerBench === 2) {
-                student = seatIdx === 0
-                  ? pickWithNoAdjacentClass(primaryClass, secondaryClass)
-                  : pickWithNoAdjacentClass(secondaryClass, primaryClass);
+              if (cornerCount === 1) {
+                student = pick(primaryClass, secondaryClass);
               } else {
-                if (seatIdx === 0) {
-                  student = pickWithNoAdjacentClass(primaryClass, secondaryClass);
-                } else if (seatIdx === 1) {
-                  student = popFromList(cornerClasses, prevCls) || popFromList(fallbackClasses, prevCls) || popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
-                } else {
-                  student = pickWithNoAdjacentClass(secondaryClass, primaryClass);
-                }
+                student = cornerPos === 0 ? pick(primaryClass, secondaryClass) : pick(secondaryClass, primaryClass);
               }
             } else {
-              const cornerPool = cornerClasses;
-              const n = cornerPool.length;
-              if (seatsPerBench === 1) {
-                student = popFromList(cornerPool, prevCls) || popFromList(fallbackClasses, prevCls) || popFromList(cornerPool, null) || popFromList(fallbackClasses, null);
-              } else if (seatsPerBench === 3) {
-                // Z-style: bench 1 = A (left) / B (right), bench 2 = B (left) / A (right), bench 3 = A / B ...
-                if (seatIdx === 1) {
-                  // middle seat (no middle class configured): prefer overflow classes, then corner classes
-                  student = popFromList(fallbackClasses, prevCls) || popFromList(cornerPool, prevCls) || popFromList(cornerPool, null) || popFromList(fallbackClasses, null);
-                } else {
-                  const k = bInCol - 1;
-                  const a = n > 2 ? Math.floor(k / 2) : 0;
-                  const flip = k % 2 === 1;
-                  const clsA = n ? cornerPool[a % n] : null;
-                  const clsB = n ? cornerPool[(a + 1) % n] : null;
-                  const leftCls = flip ? clsB : clsA;
-                  const rightCls = flip ? clsA : clsB;
-                  student = seatIdx === 0
-                    ? pickWithNoAdjacentClass(leftCls, rightCls)
-                    : pickWithNoAdjacentClass(rightCls, leftCls);
-                }
+              const pool = cornerClasses;
+              const n = pool.length;
+              if (cornerCount === 1) {
+                student = popFromList(pool, adjCls) || popFromList(fallbackClasses, adjCls) || popFromList(pool, null) || popFromList(fallbackClasses, null);
               } else {
-                const wanted = n ? cornerPool[((bInCol - 1) + seatIdx) % n] : null;
-                const alt = n ? cornerPool[((bInCol - 1) + seatIdx + 1) % n] : null;
-                student = pickWithNoAdjacentClass(wanted, alt);
+                const wanted = n ? pool[((bInCol - 1) + cornerPos) % n] : null;
+                const alt = n ? pool[((bInCol - 1) + cornerPos + 1) % n] : null;
+                student = pick(wanted, alt);
               }
             }
 
-            if (student) prevCls = Number(student.class);
+            if (student) {
+              prevCls = Number(student.class);
+              if (isThree && seatIdx === 0) leftCornerCls = Number(student.class);
+            }
 
             if (student && !allocatedIds.has(student.id)) {
               allocatedIds.add(student.id);
