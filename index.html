@@ -254,11 +254,23 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
               const n = cornerPool.length;
               if (seatsPerBench === 1) {
                 student = popFromList(cornerPool, prevCls) || popFromList(fallbackClasses, prevCls) || popFromList(cornerPool, null) || popFromList(fallbackClasses, null);
-              } else if (seatsPerBench === 3 && orderedMiddleClasses.length > 0) {
-                const wantedCorner = n ? cornerPool[(bInCol - 1 + (seatIdx === 2 ? 1 : 0) + rrCornerIdx) % n] : null;
-                const otherCorner = n ? cornerPool[(bInCol - 1 + (seatIdx === 2 ? 0 : 1) + rrCornerIdx) % n] : null;
-                student = pickWithNoAdjacentClass(wantedCorner, otherCorner);
-                if (student) rrCornerIdx += 1;
+              } else if (seatsPerBench === 3) {
+                // Z-style: bench 1 = A (left) / B (right), bench 2 = B (left) / A (right), bench 3 = A / B ...
+                if (seatIdx === 1) {
+                  // middle seat (no middle class configured): prefer overflow classes, then corner classes
+                  student = popFromList(fallbackClasses, prevCls) || popFromList(cornerPool, prevCls) || popFromList(cornerPool, null) || popFromList(fallbackClasses, null);
+                } else {
+                  const k = bInCol - 1;
+                  const a = n > 2 ? Math.floor(k / 2) : 0;
+                  const flip = k % 2 === 1;
+                  const clsA = n ? cornerPool[a % n] : null;
+                  const clsB = n ? cornerPool[(a + 1) % n] : null;
+                  const leftCls = flip ? clsB : clsA;
+                  const rightCls = flip ? clsA : clsB;
+                  student = seatIdx === 0
+                    ? pickWithNoAdjacentClass(leftCls, rightCls)
+                    : pickWithNoAdjacentClass(rightCls, leftCls);
+                }
               } else {
                 const wanted = n ? cornerPool[((bInCol - 1) + seatIdx) % n] : null;
                 const alt = n ? cornerPool[((bInCol - 1) + seatIdx + 1) % n] : null;
@@ -1500,4 +1512,4 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
-  </html>
+</html>
