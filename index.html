@@ -1,235 +1,1496 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EXAMFLOW — Student & Seat Plan Manager</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Database & PDF Seat Plan System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'Noto Sans Bengali', 'sans-serif'], bangla: ['Noto Sans Bengali', 'Inter', 'sans-serif'] } } } };
+</script>
 <style>
-:root{--navy:#17243b;--blue:#3157d5;--ink:#202a3b;--muted:#718096;--line:#e3e8f0;--bg:#f4f6fa;--white:#fff;--green:#16865b;--red:#c43c4b;--gold:#d79a28}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,"Noto Sans Bengali",sans-serif}
-button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:10px 14px;font-weight:700}
-.app{display:flex;min-height:100vh}.sidebar{width:245px;background:var(--navy);color:#fff;padding:24px 16px;flex-shrink:0}
-.brand{font-size:22px;font-weight:900;letter-spacing:1.5px;padding:4px 10px 25px}.brand small{display:block;font-size:10px;color:#aebbd0;letter-spacing:2px;margin-top:5px}
-.navbtn{width:100%;text-align:left;background:transparent;color:#cbd5e1;margin:4px 0;padding:13px 12px;border-radius:9px}.navbtn.active,.navbtn:hover{background:#2b3d5e;color:white}
-.main{flex:1;min-width:0}.topbar{height:68px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}
-.topbar span{color:var(--muted);font-size:13px}.content{padding:28px;max-width:1500px;margin:auto}
-.page{display:none}.page.active{display:block}.heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}.heading h1{font-size:25px;margin:0 0 7px}.sub{color:var(--muted);font-size:13px}
-.btn-primary{background:var(--blue);color:white}.btn-dark{background:var(--navy);color:white}.btn-light{background:#edf1f8;color:#344054}.btn-danger{background:#fff0f1;color:var(--red)}.btn-success{background:#e8f7ef;color:var(--green)}
-.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px}.stat,.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:18px}.stat label{font-size:12px;color:var(--muted)}.stat strong{display:block;font-size:27px;margin-top:8px}
-.panel{margin-bottom:18px}.panel h2{font-size:16px;margin:0 0 16px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}.field label{font-size:12px;font-weight:700;color:#526071}.field input,.field select{width:100%;border:1px solid #d7deea;border-radius:8px;padding:11px;background:white;color:var(--ink);min-width:0}
-.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.row .field{flex:1;min-width:140px}
-.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.toolbar input,.toolbar select{padding:10px;border:1px solid #d7deea;border-radius:8px;background:white}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 10px;text-align:left;border-bottom:1px solid var(--line)}th{background:#f7f9fc;color:#536174;font-size:11px;text-transform:uppercase;letter-spacing:.4px}td .actions{display:flex;gap:5px}.actions button{padding:6px 9px;font-size:11px}
-.tablewrap{overflow-x:auto}.empty{text-align:center;color:var(--muted);padding:30px}
-.classchecks{display:flex;gap:9px;flex-wrap:wrap}.classchecks label{border:1px solid var(--line);padding:8px 10px;border-radius:8px;font-size:13px}
-.hall-config{border:1px solid var(--line);padding:14px;border-radius:10px;margin:10px 0;background:#fbfcfe}.hall-config h3{margin:0 0 10px;font-size:14px}
-.hall-result{background:white;border:1px solid var(--line);border-radius:13px;padding:16px;margin:12px 0}.hall-result-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.seat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
-.bench{border:1px solid #cfd7e4;border-radius:9px;padding:10px;background:#fbfcff}.bench-title{font-size:11px;color:var(--muted);font-weight:bold;margin-bottom:8px}.seatpair{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.seat{border:1px solid #dce3ed;border-radius:7px;padding:8px;min-height:68px;background:white;font-size:11px}.seat b{display:block;font-size:12px;margin-bottom:4px}.seat small{color:#59677a;display:block;line-height:1.5}
-.note{font-size:12px;color:var(--muted);line-height:1.6}.pill{font-size:11px;padding:5px 8px;border-radius:20px;background:#eef2ff;color:#334fc1}
-#pdfStage{position:fixed;left:-12000px;top:0;width:1100px;background:white;z-index:-1;pointer-events:none}
-.pdf-page{width:1100px;background:#fff;color:#111;padding:42px 48px;font-family:Arial,sans-serif}
-.pdf-head{text-align:center;border-bottom:2px solid #222;padding-bottom:15px;margin-bottom:18px}.pdf-head h1{font-size:26px;margin:0 0 7px}.pdf-head h2{font-size:19px;margin:0 0 6px}.pdf-meta{display:flex;justify-content:space-between;font-size:14px;margin:12px 0 18px}
-.pdf-bench-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pdf-page{min-height:740px}.pdf-bench{min-height:105px}.pdf-bench{border:1.5px solid #222;padding:10px 12px;min-height:105px;break-inside:avoid}.pdf-bench-title{font-weight:bold;border-bottom:1px solid #777;padding-bottom:5px;margin-bottom:7px;font-size:13px}.pdf-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pdf-student{font-size:13px;line-height:1.6}.pdf-student strong{display:block;font-size:14px}.pdf-foot{display:flex;justify-content:space-between;margin-top:30px;font-size:13px}
-@media(max-width:900px){.sidebar{width:190px}.cards{grid-template-columns:repeat(2,1fr)}.content{padding:18px}}
-@media(max-width:650px){.app{display:block}.sidebar{width:100%;padding:12px;display:flex;overflow-x:auto;align-items:center;gap:5px}.brand{padding:5px 10px;min-width:120px;font-size:17px}.brand small{display:none}.navbtn{width:auto;white-space:nowrap;margin:0;padding:10px;font-size:12px}.topbar{height:52px;padding:0 15px}.content{padding:14px}.heading{display:block}.heading button{margin-top:12px}.cards{gap:8px}.stat{padding:12px}.stat strong{font-size:22px}.grid2{grid-template-columns:1fr}}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:100%}}
+body { font-family: 'Inter', 'Noto Sans Bengali', sans-serif; background-color: #f8fafc; color: #0f172a; }
+@media print { .no-print { display: none !important; } body { background: #fff !important; } }
 </style>
 </head>
 <body>
-<div class="app">
-<aside class="sidebar">
-  <div class="brand">EXAMFLOW<small>STUDENT & SEAT MANAGER</small></div>
-  <button class="navbtn active" data-page="dashboard">▦ Dashboard</button>
-  <button class="navbtn" data-page="students">♙ Students</button>
-  <button class="navbtn" data-page="create">▤ Create Seat Plan</button>
-  <button class="navbtn" data-page="plans">▣ Saved Plans & PDFs</button>
-  <button class="navbtn" data-page="settings">⚙ Settings</button>
-</aside>
-<main class="main">
-<header class="topbar"><strong id="topTitle">Dashboard</strong><span>Offline-ready · Data saved in this browser</span></header>
-<div class="content">
-<section class="page active" id="dashboard">
- <div class="heading"><div><h1>Dashboard</h1><div class="sub">Manage students and prepare hall-wise examination seat plans.</div></div></div>
- <div class="cards">
-  <div class="stat"><label>Total Students</label><strong id="statStudents">0</strong></div>
-  <div class="stat"><label>Classes</label><strong id="statClasses">0</strong></div>
-  <div class="stat"><label>Saved Seat Plans</label><strong id="statPlans">0</strong></div>
-  <div class="stat"><label>Total Halls in Plans</label><strong id="statHalls">0</strong></div>
- </div>
- <div class="panel"><h2>Quick Start</h2><p class="note">১. প্রথমে Student Database-এ শিক্ষার্থীদের তথ্য যোগ করুন। ২. Create Seat Plan থেকে পরীক্ষা, শিফট, ক্লাস ও হল নির্ধারণ করুন। ৩. Generate করলে প্রতিটি হলের জন্য আলাদা PDF এবং সব হলের Combined PDF পাবেন।</p><div class="row"><button class="btn-primary" onclick="go('students')">Add Students</button><button class="btn-dark" onclick="go('create')">Create Seat Plan</button></div></div>
- <div class="panel"><h2>Recent Seat Plans</h2><div id="recentPlans" class="note">No plans created yet.</div></div>
-</section>
+<div id="root"></div>
 
-<section class="page" id="students">
- <div class="heading"><div><h1>Student Database</h1><div class="sub">Required fields: Student Name, Roll Number and Class (1–10).</div></div><button class="btn-primary" onclick="openStudent()">+ Add Student</button></div>
- <div class="panel">
-  <h2>Bulk Import / Template</h2>
-  <div class="row"><button class="btn-light" onclick="downloadTemplate()">Download Excel/CSV Template</button><label class="btn-light" style="display:inline-block">Import Excel/CSV <input id="importFile" type="file" accept=".csv,.xlsx,.xls" hidden onchange="importStudents(event)"></label><button class="btn-light" onclick="exportStudents()">Export Students</button></div>
-  <p class="note">Excel/CSV ফাইলে তিনটি কলাম রাখুন: Student Name, Roll Number, Class. Import করলে একই Class + Roll থাকলে duplicate হিসেবে বাদ যাবে।</p>
- </div>
- <div class="panel">
-  <div class="toolbar"><input id="studentSearch" placeholder="Search name or roll..." oninput="renderStudents()"><select id="classFilter" onchange="renderStudents()"><option value="">All Classes</option></select><select id="sortOrder" onchange="renderStudents()"><option value="asc">Roll: Low to High</option><option value="desc">Roll: High to Low</option></select></div>
-  <div class="tablewrap"><table><thead><tr><th>Name</th><th>Roll</th><th>Class</th><th>Actions</th></tr></thead><tbody id="studentRows"></tbody></table></div>
-  <div class="note" id="studentCount"></div>
- </div>
-</section>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
 
-<section class="page" id="create">
- <div class="heading"><div><h1>Create Seat Plan</h1><div class="sub">Select multiple classes and multiple halls. Each hall gets its own PDF.</div></div></div>
- <div class="panel">
-  <h2>1. Examination Information</h2>
-  <div class="grid2">
-   <div class="field"><label>Institution Name</label><input id="institution" placeholder="School / College name"></div>
-   <div class="field"><label>Examination Name</label><input id="examName" placeholder="e.g. Annual Examination 2026"></div>
-   <div class="field"><label>Exam Date</label><input id="examDate" type="date"></div>
-   <div class="field"><label>Shift</label><select id="shift"><option>Morning Shift</option><option>Day Shift</option><option>Evening Shift</option></select></div>
-   <div class="field"><label>Shift Time</label><input id="shiftTime" value="8:00 AM – 11:00 AM"></div>
-   <div class="field"><label>Entry / Gate Label</label><input id="entryLabel" value="ENTRY"></div>
-  </div>
-  <h2 style="margin-top:10px">2. Select Classes</h2>
-  <div class="classchecks" id="classChecks"></div>
-  <p class="note">Selected class-এর শিক্ষার্থীরা database থেকে স্বয়ংক্রিয়ভাবে যুক্ত হবে।</p>
- </div>
- <div class="panel">
-  <div class="row" style="justify-content:space-between"><h2>3. Add Examination Halls</h2><button class="btn-light" onclick="addHall()">+ Add Hall</button></div>
-  <div id="hallConfigs"></div>
-  <p class="note">প্রতিটি বেঞ্চে ২ জন শিক্ষার্থী বসবে। Rows × Benches × 2 = প্রতি হলের আসনসংখ্যা। প্রয়োজন অনুযায়ী হলের সংখ্যা ও capacity পরিবর্তন করুন।</p>
- </div>
- <div class="panel">
-  <h2>4. Generate</h2>
-  <div class="row"><button class="btn-primary" onclick="generatePlan()">Generate Seat Plan</button><button class="btn-light" onclick="resetBuilder()">Reset Form</button></div>
-  <p class="note" id="generateMessage"></p>
- </div>
- <div id="generatedResults"></div>
-</section>
+const STORAGE_KEYS = {
+  STUDENTS: 'ssp_permanent_students_v1',
+  EXAMS: 'ssp_permanent_examinations_v1',
+  SETTINGS: 'ssp_institution_settings_v1'
+};
+const CLASSES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const INP = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm';
+const LBL = 'block text-xs font-semibold text-slate-700 mb-1';
+const MAX_LOGO_BYTES = 200 * 1024;
 
-<section class="page" id="plans">
- <div class="heading"><div><h1>Saved Plans & PDFs</h1><div class="sub">Previously generated seat plans remain available in this browser.</div></div></div>
- <div id="savedPlans"></div>
-</section>
+const INITIAL_SETTINGS = {
+  institutionName: 'Ideal Model High School',
+  institutionNameBn: 'আইডিয়াল মডেল উচ্চ বিদ্যালয়',
+  institutionLogo: '',
+  authorizedTeacherName: 'Controller of Examinations',
+  authorizedTeacherNameBn: 'পরীক্ষা নিয়ন্ত্রক',
+  defaultShift: 'Morning Shift',
+  defaultShiftBn: 'সকালের শিফট'
+};
 
-<section class="page" id="settings">
- <div class="heading"><div><h1>Settings & Backup</h1><div class="sub">Your data is stored locally in this browser.</div></div></div>
- <div class="panel"><h2>Data Backup</h2><p class="note">অন্য ডিভাইসে ব্যবহার বা browser data মুছে যাওয়ার আগে backup ডাউনলোড করে রাখুন।</p><div class="row"><button class="btn-primary" onclick="backupData()">Download Full Backup</button><label class="btn-light">Restore Backup <input type="file" accept=".json" hidden onchange="restoreData(event)"></label></div></div>
- <div class="panel"><h2>Important</h2><p class="note">এই সংস্করণে তথ্য browser-এর Local Storage-এ সংরক্ষিত হয়। একই browser ও device-এ তথ্য থাকবে। Browser data clear করলে বা অন্য device ব্যবহার করলে backup restore করতে হবে। এটি cloud database নয়।</p><button class="btn-danger" onclick="clearAll()">Delete All Local Data</button></div>
-</section>
-</div></main></div>
-<div id="pdfStage"></div>
+const T0 = '2026-01-10T08:00:00Z';
+const mk = (id, name, roll, cls) => ({ id, name, roll, class: cls, created_at: T0, updated_at: T0 });
+const INITIAL_STUDENTS = [
+  mk('stu-101', 'Arafat Hossain', 1, 1), mk('stu-102', 'Nusrat Jahan', 2, 1), mk('stu-103', 'Tanvir Ahmed', 3, 1),
+  mk('stu-104', 'Mahi Islam', 4, 1), mk('stu-105', 'Rakibul Hasan', 5, 1), mk('stu-106', 'Sadia Afrin', 6, 1),
+  mk('stu-201', 'Mehedi Hasan', 1, 2), mk('stu-202', 'Tasnim Tabassum', 2, 2), mk('stu-203', 'Farhan Sadiq', 3, 2),
+  mk('stu-204', 'Lamia Akter', 4, 2), mk('stu-205', 'Rohan Chowdhury', 5, 2), mk('stu-206', 'Mim Akter', 6, 2),
+  mk('stu-301', 'Sabbir Rahman', 1, 3), mk('stu-302', 'Tania Sultana', 2, 3), mk('stu-303', 'Nabil Mahmud', 3, 3),
+  mk('stu-401', 'Jannatul Ferdous', 1, 4), mk('stu-402', 'Shakil Ahmed', 2, 4), mk('stu-403', 'Anika Tabassum', 3, 4),
+  mk('stu-501', 'Fahim Shahriar', 1, 5), mk('stu-502', 'Sumaiya Akter', 2, 5), mk('stu-503', 'Imran Hossain', 3, 5)
+];
 
-<div id="studentModal" style="display:none;position:fixed;inset:0;background:#0008;z-index:20;align-items:center;justify-content:center;padding:15px">
- <div class="panel" style="width:min(430px,100%);margin:0">
-  <h2 id="modalTitle">Add Student</h2>
-  <input type="hidden" id="editIndex">
-  <div class="field"><label>Student Name</label><input id="sName" placeholder="Student full name"></div>
-  <div class="field"><label>Roll Number</label><input id="sRoll" type="number" min="1" placeholder="Roll number"></div>
-  <div class="field"><label>Class</label><select id="sClass"></select></div>
-  <div class="row"><button class="btn-primary" onclick="saveStudent()">Save Student</button><button class="btn-light" onclick="closeStudent()">Cancel</button></div>
-  <p class="note" id="studentError"></p>
- </div>
-</div>
+/* ---------- helpers ---------- */
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-<script>
-const KEY='examflow_v2_data';
-const defaultData={students:[],plans:[],settings:{}};
-let db=loadDB(),hallCount=2;
-function cloneDefault(){return {students:[],plans:[],settings:{}}}
-function loadDB(){try{const raw=JSON.parse(localStorage.getItem(KEY)||'null');if(!raw||!Array.isArray(raw.students)||!Array.isArray(raw.plans))return cloneDefault();return {students:raw.students.filter(s=>s&&typeof s.name==='string').map(s=>({name:s.name,roll:Number(s.roll),classNo:Number(s.classNo)})).filter(s=>s.name&&Number.isInteger(s.roll)&&s.roll>0&&Number.isInteger(s.classNo)&&s.classNo>=1&&s.classNo<=10),plans:raw.plans.filter(p=>p&&Array.isArray(p.halls)),settings:raw.settings||{}}}catch(e){return cloneDefault()}}
-function saveDB(){try{localStorage.setItem(KEY,JSON.stringify(db));updateDashboard();return true}catch(e){alert('ডেটা সংরক্ষণ করা যায়নি। Browser storage পূর্ণ হতে পারে। Backup নিয়ে কিছু পুরোনো plan মুছে আবার চেষ্টা করুন।');return false}}
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function go(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===page));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('topTitle').textContent=({dashboard:'Dashboard',students:'Student Database',create:'Create Seat Plan',plans:'Saved Plans & PDFs',settings:'Settings'})[page];if(page==='plans')renderSavedPlans();if(page==='students')renderStudents()}
-document.querySelectorAll('.navbtn').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
-function updateDashboard(){document.getElementById('statStudents').textContent=db.students.length;document.getElementById('statClasses').textContent=new Set(db.students.map(s=>s.classNo)).size;document.getElementById('statPlans').textContent=db.plans.length;document.getElementById('statHalls').textContent=db.plans.reduce((a,p)=>a+p.halls.length,0);document.getElementById('recentPlans').innerHTML=db.plans.slice(-5).reverse().map(p=>`<div style="padding:9px 0;border-bottom:1px solid #eee"><b>${esc(p.examName)}</b> · ${esc(p.date||'No date')} · ${p.halls.length} halls</div>`).join('')||'No plans created yet.'}
-function classOptions(){return Array.from({length:10},(_,i)=>`<option value="${i+1}">Class ${i+1}</option>`).join('')}
-document.getElementById('sClass').innerHTML=classOptions();
-function renderStudents(){let q=document.getElementById('studentSearch').value.toLowerCase(),f=document.getElementById('classFilter').value,dir=document.getElementById('sortOrder').value;let classes=[...new Set(db.students.map(s=>s.classNo))].sort((a,b)=>a-b);document.getElementById('classFilter').innerHTML='<option value="">All Classes</option>'+classes.map(c=>`<option value="${c}" ${f==c?'selected':''}>Class ${c}</option>`).join('');let arr=db.students.filter(s=>(!f||s.classNo==f)&&(`${s.name} ${s.roll}`.toLowerCase().includes(q))).sort((a,b)=>dir==='asc'?a.roll-b.roll:b.roll-a.roll);document.getElementById('studentRows').innerHTML=arr.map(s=>{let i=db.students.indexOf(s);return `<tr><td>${esc(s.name)}</td><td>${esc(s.roll)}</td><td>Class ${s.classNo}</td><td><div class="actions"><button class="btn-light" onclick="openStudent(${i})">Edit</button><button class="btn-danger" onclick="deleteStudent(${i})">Delete</button></div></td></tr>`}).join('')||'<tr><td colspan="4" class="empty">No students found.</td></tr>';document.getElementById('studentCount').textContent=`Showing ${arr.length} of ${db.students.length} students`}
-function openStudent(i=-1){document.getElementById('studentModal').style.display='flex';document.getElementById('studentError').textContent='';document.getElementById('editIndex').value=i;let nameEl=document.getElementById('sName'),rollEl=document.getElementById('sRoll'),classEl=document.getElementById('sClass');if(i<0){document.getElementById('modalTitle').textContent='Add Student';nameEl.value='';rollEl.value='';classEl.value='1'}else{let s=db.students[i];document.getElementById('modalTitle').textContent='Edit Student';nameEl.value=s.name;rollEl.value=s.roll;classEl.value=s.classNo}}
-function closeStudent(){document.getElementById('studentModal').style.display='none'}
-function saveStudent(){let name=document.getElementById('sName').value.trim(),roll=Number(document.getElementById('sRoll').value),classNo=Number(document.getElementById('sClass').value),idx=Number(document.getElementById('editIndex').value);let error=document.getElementById('studentError');if(!name||!Number.isInteger(roll)||roll<1||classNo<1||classNo>10){error.textContent='Please enter a valid name, roll and class.';return}let duplicate=db.students.some((s,i)=>i!==idx&&s.roll===roll&&s.classNo===classNo);if(duplicate){error.textContent='This roll number already exists in the selected class.';return}let item={name,roll,classNo};if(idx<0)db.students.push(item);else db.students[idx]=item;db.students.sort((a,b)=>a.classNo-b.classNo||a.roll-b.roll);saveDB();renderStudents();closeStudent()}
-function deleteStudent(i){if(confirm('Delete this student?')){db.students.splice(i,1);saveDB();renderStudents()}}
-function downloadFile(name,content,type){let a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
-function downloadTemplate(){if(!window.XLSX){alert('Excel library load হয়নি। Internet চালু করে reload করুন।');return}let rows=[['Student Name','Roll Number','Class'],['Example Student',1,1]];let ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'student_import_template.xlsx')}
-function importStudents(e){if(!window.XLSX){alert('Excel library load হয়নি। Internet চালু করে reload করুন।');e.target.value='';return}let file=e.target.files[0];if(!file)return;let reader=new FileReader();reader.onload=ev=>{try{let wb=file.name.toLowerCase().endsWith('.csv')?XLSX.read(ev.target.result,{type:'string'}):XLSX.read(ev.target.result,{type:'array'});let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let added=0,skipped=0;rows.forEach(r=>{let keys=Object.keys(r),get=(...names)=>{let k=keys.find(x=>names.includes(x.trim().toLowerCase()));return k===undefined?'':r[k]};let name=String(get('student name','name')).trim(),roll=Number(get('roll number','roll')),classNo=Number(String(get('class','class number')).replace(/[^0-9]/g,''));if(!name||!Number.isInteger(roll)||roll<1||classNo<1||classNo>10||db.students.some(s=>s.roll===roll&&s.classNo===classNo)){skipped++;return}db.students.push({name,roll,classNo});added++});db.students.sort((a,b)=>a.classNo-b.classNo||a.roll-b.roll);saveDB();renderStudents();alert(`Imported: ${added}\\nSkipped: ${skipped}`)}catch(err){alert('Could not read this file. Check the template and try again.')}e.target.value=''};if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file);else reader.readAsArrayBuffer(file)}
-function exportStudents(){if(!window.XLSX){alert('Excel library load হয়নি। Internet চালু করে reload করুন।');return}let ws=XLSX.utils.json_to_sheet(db.students.map(s=>({'Student Name':s.name,'Roll Number':s.roll,'Class':s.classNo}))),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'students.xlsx')}
-function addHall(){let n=hallCount++;let d=document.createElement('div');d.className='hall-config';d.dataset.hall=n;d.innerHTML=`<h3>Hall ${n+1}</h3><div class="row"><div class="field"><label>Hall Name</label><input class="hallName" value="Hall ${n+1}"></div><div class="field"><label>Rows</label><input class="hallRows" type="number" min="1" max="30" value="5"></div><div class="field"><label>Benches per Row</label><input class="hallBenches" type="number" min="1" max="20" value="4"></div><button class="btn-danger" onclick="this.closest('.hall-config').remove()">Remove</button></div><div class="note">Capacity: <b class="capacity">40</b> students</div>`;document.getElementById('hallConfigs').appendChild(d);d.querySelectorAll('input').forEach(x=>x.addEventListener('input',()=>{let cap=Math.max(1,Number(d.querySelector('.hallRows').value))*Math.max(1,Number(d.querySelector('.hallBenches').value))*2;d.querySelector('.capacity').textContent=cap}))}
-function initBuilder(){let c=document.getElementById('classChecks');c.innerHTML=Array.from({length:10},(_,i)=>`<label><input type="checkbox" value="${i+1}"> Class ${i+1}</label>`).join('');addHall();addHall()}
-function resetBuilder(){document.getElementById('institution').value='';document.getElementById('examName').value='';document.getElementById('examDate').value='';document.getElementById('shift').value='Morning Shift';document.getElementById('shiftTime').value='8:00 AM – 11:00 AM';document.querySelectorAll('#classChecks input').forEach(x=>x.checked=false);document.getElementById('hallConfigs').innerHTML='';hallCount=0;addHall();addHall();document.getElementById('generatedResults').innerHTML='';generateMessage.textContent=''}
-function generatePlan(){
- const selected=[...document.querySelectorAll('#classChecks input:checked')].map(x=>Number(x.value)).sort((a,b)=>a-b);
- const configs=[...document.querySelectorAll('.hall-config')].map(d=>({name:d.querySelector('.hallName').value.trim(),rows:Number(d.querySelector('.hallRows').value),benches:Number(d.querySelector('.hallBenches').value)}));
- const msg=document.getElementById('generateMessage');
- if(!selected.length){msg.textContent='Please select at least one class.';return}
- if(!configs.length||configs.some(h=>!h.name||!Number.isInteger(h.rows)||!Number.isInteger(h.benches)||h.rows<1||h.benches<1||h.rows>30||h.benches>20)){msg.textContent='Please check hall names, rows and benches. Rows must be 1–30 and benches 1–20.';return}
- const normalizedNames=configs.map(h=>h.name.toLowerCase());
- if(new Set(normalizedNames).size!==normalizedNames.length){msg.textContent='প্রতিটি হলের নাম আলাদা দিন। একই নাম একাধিকবার ব্যবহার করা যাবে না।';return}
- const students=db.students.filter(s=>selected.includes(s.classNo)).sort((a,b)=>a.classNo-b.classNo||a.roll-b.roll);
- if(!students.length){msg.textContent='No students found in selected classes.';return}
- const capacity=configs.reduce((a,h)=>a+h.rows*h.benches*2,0);
- if(students.length>capacity){msg.textContent=`Not enough seats. Students: ${students.length}, total capacity: ${capacity}. Add halls or increase capacity.`;return}
- // Round-robin class allocation keeps neighboring seats mixed across selected classes.
- const queues=selected.map(c=>students.filter(s=>s.classNo===c));
- const ordered=[];while(queues.some(q=>q.length)){queues.forEach(q=>{if(q.length)ordered.push(q.shift())})}
- let cursor=0;
- const halls=configs.map(h=>{const benches=[];for(let r=1;r<=h.rows;r++)for(let b=1;b<=h.benches;b++){const seats=[];for(let seat=0;seat<2;seat++)seats.push(ordered[cursor++]||null);benches.push({row:r,bench:b,seats})}return {...h,benches,studentCount:benches.reduce((n,b)=>n+b.seats.filter(Boolean).length,0)}});
- const plan={id:Date.now()+Math.floor(Math.random()*1000),institution:document.getElementById('institution').value.trim()||'Institution Name',examName:document.getElementById('examName').value.trim()||'Examination',date:document.getElementById('examDate').value,shift:document.getElementById('shift').value,time:document.getElementById('shiftTime').value.trim(),entry:document.getElementById('entryLabel').value.trim()||'ENTRY',classes:selected,halls,created:new Date().toISOString()};
- db.plans.push(plan);if(!saveDB()){db.plans.pop();return}renderGenerated(plan);msg.textContent=`Successfully generated: ${students.length} students assigned across ${halls.length} halls.`;
+function toBengaliDigits(val) {
+  const map = { '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪', '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯' };
+  return String(val).replace(/[0-9]/g, (d) => map[d]);
 }
-function renderGenerated(p){let root=document.getElementById('generatedResults');root.innerHTML=`<div class="panel"><div class="hall-result-head"><div><h2>Generated Seat Plan</h2><div class="note">${esc(p.examName)} · ${p.halls.length} halls · ${p.halls.reduce((n,h)=>n+h.studentCount,0)} students</div></div><button class="btn-dark" onclick="downloadCombined(${p.id})">Download Combined PDF</button><button class="btn-light" onclick="downloadStudentList(${p.id})">Student-wise PDF</button></div></div>`+p.halls.map((h,i)=>`<div class="hall-result"><div class="hall-result-head"><div><b>${esc(h.name)}</b> <span class="pill">${h.studentCount} students</span><div class="note">${h.rows} rows × ${h.benches} benches</div></div><button class="btn-primary" onclick="downloadHall(${p.id},${i})">Download ${esc(h.name)} PDF</button></div><div class="seat-grid">${h.benches.map(b=>`<div class="bench"><div class="bench-title">ROW ${b.row} · BENCH ${b.bench}</div><div class="seatpair">${b.seats.map(s=>s?`<div class="seat"><b>Class ${s.classNo} · Roll ${s.roll}</b><small>${esc(s.name)}</small></div>`:`<div class="seat"><small>Empty Seat</small></div>`).join('')}</div></div>`).join('')}</div></div>`).join('');root.scrollIntoView({behavior:'smooth',block:'start'})}
-function getPlan(id){return db.plans.find(p=>p.id===id)}
-function renderSavedPlans(){let root=document.getElementById('savedPlans');root.innerHTML=db.plans.slice().reverse().map(p=>`<div class="panel"><div class="hall-result-head"><div><h2>${esc(p.examName)}</h2><div class="note">${esc(p.institution)} · ${esc(p.date||'No date')} · ${esc(p.shift)} · ${p.halls.length} halls</div></div><div class="row"><button class="btn-dark" onclick="downloadCombined(${p.id})">Combined PDF</button><button class="btn-light" onclick="downloadStudentList(${p.id})">Student-wise PDF</button><button class="btn-danger" onclick="deletePlan(${p.id})">Delete</button></div></div><div class="row" style="margin-top:12px">${p.halls.map((h,i)=>`<button class="btn-light" onclick="downloadHall(${p.id},${i})">${esc(h.name)} PDF</button>`).join('')}</div></div>`).join('')||'<div class="panel empty">No saved seat plans yet.</div>'}
-function deletePlan(id){if(confirm('Delete this saved plan?')){db.plans=db.plans.filter(p=>p.id!==id);saveDB();renderSavedPlans()}}
-function buildPdfPage(p,h,benchSlice,pageNo,totalPages){
- const div=document.createElement('div');div.className='pdf-page';
- div.innerHTML=`<div class="pdf-head"><h1>${esc(p.institution)}</h1><h2>${esc(p.examName)} — SEAT PLAN</h2><div style="font-size:17px;font-weight:bold;margin-top:5px">${esc(h.name)}</div></div>
- <div class="pdf-meta"><span><b>Shift:</b> ${esc(p.shift)}</span><span><b>Time:</b> ${esc(p.time||'—')}</span><span><b>Date:</b> ${esc(p.date||'—')}</span><span><b>Entry:</b> ${esc(p.entry)}</span></div>
- <div class="pdf-meta"><span><b>Classes:</b> ${p.classes.map(esc).join(', ')}</span><span><b>Total Students:</b> ${h.studentCount}</span><span><b>Rows:</b> ${h.rows}</span><span><b>Benches/Row:</b> ${h.benches}</span></div>
- <div class="pdf-bench-grid">${benchSlice.map(b=>`<div class="pdf-bench"><div class="pdf-bench-title">ROW ${b.row} — BENCH ${b.bench}</div><div class="pdf-two">${b.seats.map(s=>s?`<div class="pdf-student"><strong>Class ${s.classNo} · Roll ${s.roll}</strong>${esc(s.name)}</div>`:`<div class="pdf-student">Empty Seat</div>`).join('')}</div></div>`).join('')}</div>
- <div class="pdf-foot"><span>Prepared by: __________________</span><span>Signature: __________________</span><span>Page ${pageNo} of ${totalPages}</span></div>`;return div;
+function toEnglishDigits(val) {
+  const map = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+  return String(val).replace(/[০-৯]/g, (d) => map[d]);
 }
-async function renderElementToPdf(pdf,el,isFirst){
- const stage=document.getElementById('pdfStage');stage.innerHTML='';stage.appendChild(el);
- if(document.fonts&&document.fonts.ready)await document.fonts.ready;
- const canvas=await html2canvas(el,{scale:1.5,backgroundColor:'#ffffff',useCORS:true,logging:false,windowWidth:1200});
- const img=canvas.toDataURL('image/jpeg',0.94);const pw=297,ph=210;
- const ratio=Math.min(pw/canvas.width,ph/canvas.height);const w=canvas.width*ratio,h=canvas.height*ratio;
- if(!isFirst)pdf.addPage('a4','landscape');pdf.addImage(img,'JPEG',(pw-w)/2,(ph-h)/2,w,h);
+function fmtNum(val, lang) { return lang === 'bn' ? toBengaliDigits(val) : String(val); }
+
+function todayLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-async function makePdf(p,hallIndexes,filename){
- if(!window.html2canvas||!window.jspdf){alert('PDF library load হয়নি। Internet connection চালু করে page reload করুন।');return}
- const pdf=new jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let first=true;
- try{
-  for(const idx of hallIndexes){const hall=p.halls[idx];if(!hall)continue;const perPage=8;const slices=[];for(let i=0;i<hall.benches.length;i+=perPage)slices.push(hall.benches.slice(i,i+perPage));if(!slices.length)slices.push([]);
-   for(let i=0;i<slices.length;i++){const el=buildPdfPage(p,hall,slices[i],i+1,slices.length);await renderElementToPdf(pdf,el,first);first=false;}
+function loadLS(key, fallback) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
+}
+function saveLS(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (e) { console.warn('localStorage save failed:', e); return false; }
+}
+
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  if(first){alert('এই plan-এ কোনো hall পাওয়া যায়নি।');return}pdf.save(filename);
- }catch(err){console.error(err);alert('PDF তৈরি করতে সমস্যা হয়েছে। Page reload করে আবার চেষ্টা করুন।')}
- finally{document.getElementById('pdfStage').innerHTML=''}
-}
-function collectStudentSeatList(p){const list=[];p.halls.forEach(h=>h.benches.forEach(b=>b.seats.forEach((s,seatIndex)=>{if(s)list.push({...s,hall:h.name,row:b.row,bench:b.bench,seat:seatIndex+1})})));return list.sort((a,b)=>a.classNo-b.classNo||a.roll-b.roll)}
-function buildStudentPdfPage(p,list,pageNo,totalPages){
- const div=document.createElement('div');div.className='pdf-page';
- div.innerHTML=`<div class="pdf-head"><h1>${esc(p.institution)}</h1><h2>${esc(p.examName)} — STUDENT-WISE SEAT LIST</h2></div><div class="pdf-meta"><span><b>Shift:</b> ${esc(p.shift)}</span><span><b>Time:</b> ${esc(p.time||'—')}</span><span><b>Date:</b> ${esc(p.date||'—')}</span><span><b>Total:</b> ${collectStudentSeatList(p).length}</span></div>
- <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${['SL','Student Name','Class','Roll','Hall','Row','Bench','Seat'].map(x=>`<th style="border:1px solid #333;padding:8px">${x}</th>`).join('')}</tr></thead><tbody>${list.map((s,i)=>`<tr>${[s.sl,esc(s.name),s.classNo,s.roll,esc(s.hall),s.row,s.bench,s.seat].map(v=>`<td style="border:1px solid #777;padding:7px">${v}</td>`).join('')}</tr>`).join('')}</tbody></table><div class="pdf-foot"><span>Prepared by: __________________</span><span>Page ${pageNo} of ${totalPages}</span></div>`;return div;
-}
-async function downloadStudentList(id){
- const p=getPlan(id);if(!p)return;if(!window.html2canvas||!window.jspdf){alert('PDF library load হয়নি। Internet connection চালু করে page reload করুন।');return}
- const all=collectStudentSeatList(p);const perPage=18;const chunks=[];for(let i=0;i<all.length;i+=perPage)chunks.push(all.slice(i,i+perPage));if(!chunks.length)chunks.push([]);
- const pdf=new jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let first=true;
- try{for(let i=0;i<chunks.length;i++){const rows=chunks[i].map((s,j)=>({...s,sl:i*perPage+j+1}));const el=buildStudentPdfPage(p,rows,i+1,chunks.length);await renderElementToPdf(pdf,el,first);first=false;}pdf.save(`${safeFile(p.examName)}_Student_Wise_SeatList.pdf`)}catch(err){console.error(err);alert('Student-wise PDF তৈরি করা যায়নি। আবার চেষ্টা করুন।')}finally{document.getElementById('pdfStage').innerHTML=''}
+  return copy;
 }
 
-function safeFile(s){return String(s||'document').normalize('NFKD').replace(/[^\w\-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,50)||'document'}
-function downloadHall(id,i){let p=getPlan(id);if(p)makePdf(p,[i],`${safeFile(p.examName)}_${safeFile(p.halls[i].name)}_SeatPlan.pdf`)}
-function downloadCombined(id){let p=getPlan(id);if(p)makePdf(p,p.halls.map((_,i)=>i),`${safeFile(p.examName)}_Complete_SeatPlan.pdf`)}
-function backupData(){downloadFile('examflow_backup.json',JSON.stringify(db,null,2),'application/json')}
-function restoreData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!x||!Array.isArray(x.students)||!Array.isArray(x.plans))throw Error();db={students:x.students.filter(s=>s&&String(s.name||'').trim()&&Number.isInteger(Number(s.roll))&&Number(s.roll)>0&&Number.isInteger(Number(s.classNo))&&Number(s.classNo)>=1&&Number(s.classNo)<=10).map(s=>({name:String(s.name).trim(),roll:Number(s.roll),classNo:Number(s.classNo)})),plans:x.plans.filter(p=>p&&Array.isArray(p.halls)),settings:x.settings||{}};if(!saveDB())return;renderStudents();renderSavedPlans();alert('Backup restored successfully.')}catch(err){alert('Invalid backup file.')}e.target.value=''};r.readAsText(f)}
-function clearAll(){if(confirm('This will permanently delete all students and saved plans from this browser. Continue?')){db=cloneDefault();saveDB();renderStudents();renderSavedPlans();alert('Local data deleted.')}}
-initBuilder();updateDashboard();renderStudents();
+function seatLabel(idx, totalSeats, lang) {
+  const bn = lang === 'bn';
+  if (totalSeats === 1) return bn ? 'একক' : 'Single';
+  if (totalSeats === 2) return idx === 0 ? (bn ? 'বাম' : 'Left') : (bn ? 'ডান' : 'Right');
+  if (idx === 0) return bn ? 'বাম' : 'Left';
+  if (idx === 1) return bn ? 'মাঝে' : 'Mid';
+  return bn ? 'ডান' : 'Right';
+}
+
+function allocateSeats(selectedStudents, hallsConfig, pattern) {
+  const isRollMix = pattern === 'z_mix' || pattern === 'l_mix';
+  const isLStyle = pattern === 'l_serial' || pattern === 'l_mix';
+
+  const byClass = {};
+  selectedStudents.forEach((s) => {
+    const c = Number(s.class);
+    if (!byClass[c]) byClass[c] = [];
+    byClass[c].push({ ...s });
+  });
+  const allSelectedClassKeys = Object.keys(byClass).map(Number).sort((a, b) => a - b);
+  allSelectedClassKeys.forEach((c) => {
+    byClass[c] = isRollMix ? shuffleArray(byClass[c]) : byClass[c].sort((a, b) => Number(a.roll) - Number(b.roll));
+  });
+  const queues = {};
+  allSelectedClassKeys.forEach((c) => { queues[c] = [...byClass[c]]; });
+
+  const popFromClass = (c) => {
+    const clsNum = Number(c);
+    if (queues[clsNum] && queues[clsNum].length > 0) return queues[clsNum].shift();
+    return null;
+  };
+
+  const popFromList = (list, preferDifferentClass = null) => {
+    if (!Array.isArray(list) || list.length === 0) return null;
+    if (preferDifferentClass !== null) {
+      for (const c of list) {
+        if (Number(c) !== Number(preferDifferentClass) && queues[c]?.length > 0) {
+          return queues[c].shift();
+        }
+      }
+    }
+    for (const c of list) {
+      if (queues[c]?.length > 0) return queues[c].shift();
+    }
+    return null;
+  };
+
+  const allocations = [];
+  const hallSummaries = [];
+  const allocatedIds = new Set();
+
+  hallsConfig.forEach((hall, hIdx) => {
+    const hallId = hall.id || `hall-${hIdx + 1}`;
+    const hallNumber = String(hall.hall_number || `Hall ${hIdx + 1}`).trim();
+    const totalRows = 1;
+    const seatsPerBench = Math.min(3, Math.max(1, Number(hall.seats_per_bench) || 2));
+    const colCount = Math.max(1, Number(hall.column_count) || 2);
+    const colBenches = [];
+    for (let c = 0; c < colCount; c++) {
+      const rawVal = Array.isArray(hall.column_benches) ? hall.column_benches[c] : 5;
+      colBenches.push(Math.max(1, Number(rawVal) || 1));
+    }
+
+    const assignedClasses = (Array.isArray(hall.assigned_classes) && hall.assigned_classes.length > 0)
+      ? hall.assigned_classes.map(Number).filter((c) => allSelectedClassKeys.includes(c))
+      : allSelectedClassKeys;
+
+    const fallbackClasses = (Array.isArray(hall.fallback_classes) && hall.fallback_classes.length > 0)
+      ? hall.fallback_classes.map(Number).filter((c) => allSelectedClassKeys.includes(c) && !assignedClasses.includes(c))
+      : allSelectedClassKeys.filter((c) => !assignedClasses.includes(c));
+
+    const cornerClasses = assignedClasses.length > 0 ? assignedClasses : allSelectedClassKeys;
+    const orderedMiddleClasses = Array.isArray(hall.middle_classes) && hall.middle_classes.length > 0
+      ? hall.middle_classes.map(Number)
+      : [
+          ...(hall.middle_class ? [Number(hall.middle_class)] : []),
+          ...(hall.middle_fallback_class ? [Number(hall.middle_fallback_class)] : [])
+        ];
+    const middleClass = orderedMiddleClasses[0] || null;
+    const middleFallbackClass = orderedMiddleClasses[1] || null;
+
+    let hallAllocatedCount = 0, hallCapacity = 0, benchCounter = 0;
+    colBenches.forEach((bc) => { hallCapacity += totalRows * bc * seatsPerBench; });
+    const maxBenches = Math.max(...colBenches);
+
+    for (let bInCol = 1; bInCol <= maxBenches; bInCol++) {
+      for (let colIdx = 0; colIdx < colCount; colIdx++) {
+        const rowNum = 1;
+        const primaryClass = cornerClasses[colIdx % cornerClasses.length];
+        const secondaryClass = cornerClasses[(colIdx + 1) % cornerClasses.length];
+
+        if (bInCol <= colBenches[colIdx]) {
+          benchCounter += 1;
+          let prevCls = null;
+          let leftCornerCls = null;
+          const isThree = seatsPerBench === 3;
+
+          for (let seatIdx = 0; seatIdx < seatsPerBench; seatIdx++) {
+            let student = null;
+            const isMiddleSeat = isThree && seatIdx === 1;
+            // For 3-seat benches the two corner seats behave exactly like a 2-seat bench (left = 0, right = 1)
+            const cornerPos = isThree ? (seatIdx === 2 ? 1 : 0) : seatIdx;
+            const cornerCount = isThree ? 2 : seatsPerBench;
+            // class we must not sit next to: for corners compare corner-to-corner, otherwise the previous seat
+            const adjCls = isThree ? (seatIdx === 2 ? leftCornerCls : null) : prevCls;
+
+            const pick = (primaryCandidate, secondaryCandidate) => {
+              if (primaryCandidate && Number(primaryCandidate) !== Number(adjCls)) {
+                const s = popFromClass(primaryCandidate);
+                if (s) return s;
+              }
+              if (secondaryCandidate && Number(secondaryCandidate) !== Number(adjCls)) {
+                const s = popFromClass(secondaryCandidate);
+                if (s) return s;
+              }
+              const sCornerDiff = popFromList(cornerClasses, adjCls);
+              if (sCornerDiff) return sCornerDiff;
+              const sFallbackDiff = popFromList(fallbackClasses, adjCls);
+              if (sFallbackDiff) return sFallbackDiff;
+              if (primaryCandidate) {
+                const s = popFromClass(primaryCandidate);
+                if (s) return s;
+              }
+              return popFromList(cornerClasses, null) || popFromList(fallbackClasses, null);
+            };
+
+            if (isMiddleSeat) {
+              // Middle seat: use the class(es) chosen for the middle, in the selected order
+              if (orderedMiddleClasses.length > 0) {
+                for (const mc of orderedMiddleClasses) {
+                  if (Number(mc) !== Number(prevCls)) {
+                    const s = popFromClass(mc);
+                    if (s) { student = s; break; }
+                  }
+                }
+                if (!student) {
+                  for (const mc of orderedMiddleClasses) {
+                    const s = popFromClass(mc);
+                    if (s) { student = s; break; }
+                  }
+                }
+              }
+              if (!student) {
+                student = popFromList(fallbackClasses, prevCls) || popFromList(cornerClasses, prevCls)
+                  || popFromList(fallbackClasses, null) || popFromList(cornerClasses, null);
+              }
+            } else if (isLStyle) {
+              if (cornerCount === 1) {
+                student = pick(primaryClass, secondaryClass);
+              } else {
+                student = cornerPos === 0 ? pick(primaryClass, secondaryClass) : pick(secondaryClass, primaryClass);
+              }
+            } else {
+              const pool = cornerClasses;
+              const n = pool.length;
+              if (cornerCount === 1) {
+                student = popFromList(pool, adjCls) || popFromList(fallbackClasses, adjCls) || popFromList(pool, null) || popFromList(fallbackClasses, null);
+              } else {
+                const wanted = n ? pool[((bInCol - 1) + cornerPos) % n] : null;
+                const alt = n ? pool[((bInCol - 1) + cornerPos + 1) % n] : null;
+                student = pick(wanted, alt);
+              }
+            }
+
+            if (student) {
+              prevCls = Number(student.class);
+              if (isThree && seatIdx === 0) leftCornerCls = Number(student.class);
+            }
+
+            if (student && !allocatedIds.has(student.id)) {
+              allocatedIds.add(student.id);
+              hallAllocatedCount += 1;
+              allocations.push({
+                id: `${hallId}-c${colIdx + 1}-r${rowNum}-b${bInCol}-s${seatIdx + 1}`,
+                hall_id: hallId,
+                hall_number: hallNumber,
+                column_number: colIdx + 1,
+                row_number: rowNum,
+                bench_number: bInCol,
+                overall_bench_number: benchCounter,
+                seat_index: seatIdx + 1,
+                seats_per_bench: seatsPerBench,
+                student_id: student.id,
+                student_name_snapshot: student.name,
+                student_roll_snapshot: Number(student.roll),
+                student_class_snapshot: Number(student.class)
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const hallAllocForSummary = allocations.filter((a) => a.hall_number === hallNumber);
+    const classBreakdown = {};
+    hallAllocForSummary.forEach((a) => {
+      const c = Number(a.student_class_snapshot);
+      classBreakdown[c] = (classBreakdown[c] || 0) + 1;
+    });
+
+    hallSummaries.push({
+      id: hallId,
+      hall_number: hallNumber,
+      total_rows: totalRows,
+      column_count: colCount,
+      column_benches: colBenches,
+      seats_per_bench: seatsPerBench,
+      assigned_classes: assignedClasses,
+      fallback_classes: fallbackClasses,
+      middle_classes: orderedMiddleClasses,
+      middle_class: middleClass,
+      middle_fallback_class: middleFallbackClass,
+      class_breakdown: classBreakdown,
+      capacity: hallCapacity,
+      allocated_count: hallAllocatedCount
+    });
+  });
+
+  const unallocated = [];
+  allSelectedClassKeys.forEach((c) => queues[c].forEach((s) => { if (!allocatedIds.has(s.id)) unallocated.push(s); }));
+  const hallOrder = {};
+  hallSummaries.forEach((h, i) => { hallOrder[h.hall_number] = i; });
+  allocations.sort((x, y) =>
+    (hallOrder[x.hall_number] - hallOrder[y.hall_number]) || (x.column_number - y.column_number) ||
+    (x.bench_number - y.bench_number) || (x.seat_index - y.seat_index));
+  return { allocations, hallSummaries, unallocated };
+}
+
+function formatHallClassBreakdown(hallAlloc, lang, isBn) {
+  const counts = {};
+  hallAlloc.forEach((a) => {
+    const c = Number(a.student_class_snapshot);
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  const keys = Object.keys(counts).map(Number).sort((a, b) => a - b);
+  return keys.map((c) => `${isBn ? 'ক্লাস' : 'Class'} ${fmtNum(c, lang)} = ${fmtNum(counts[c], lang)}`);
+}
+
+function buildLayoutSections({ hallSummaries, allocations, hallFilter, lang, t, exam, shiftName, isBn }) {
+  const halls = hallFilter ? hallSummaries.filter((h) => h.hall_number === hallFilter) : hallSummaries;
+  return halls.map((h, idx) => {
+    const hallAlloc = allocations.filter((a) => a.hall_number === h.hall_number);
+    const perClassLines = formatHallClassBreakdown(hallAlloc, lang, isBn);
+    const cols = (h.column_benches || []).map((benchCount, cIdx) => {
+      let benchesHtml = '';
+      let n = 0;
+      for (let r = 1; r <= h.total_rows; r++) {
+        for (let b = 1; b <= benchCount; b++) {
+          n++;
+          let seats = '';
+          for (let s = 1; s <= h.seats_per_bench; s++) {
+            const a = hallAlloc.find((x) => x.column_number === cIdx + 1 && x.row_number === r && x.bench_number === b && x.seat_index === s);
+            seats += a
+              ? `<div class="seat"><div>${t.cls}: <b>${fmtNum(a.student_class_snapshot, lang)}</b></div>
+                  <div>${t.roll}: <b>${fmtNum(String(a.student_roll_snapshot).padStart(2, '0'), lang)}</b></div>
+                  <div>${t.name}: <b>${esc(a.student_name_snapshot)}</b></div></div>`
+              : `<div class="seat empty">—</div>`;
+          }
+          benchesHtml += `<div class="bench"><div class="bench-no">${t.bench} ${fmtNum(n, lang)}</div><div class="seats">${seats}</div></div>`;
+        }
+      }
+      return `<div class="lcol"><div class="lcol-title">${t.bench} - ${t.col} - ${fmtNum(cIdx + 1, lang)}</div>${benchesHtml}</div>`;
+    }).join('');
+
+    return `
+      <div class="layout-page ${idx > 0 ? 'page-break' : ''}">
+        <div class="layout-top">
+          <div class="hall-info">
+            <div class="big">${t.hall}: ${esc(h.hall_number)}</div>
+            <div class="class-breakdown">${perClassLines.map((line) => `<div>${line}</div>`).join('')}</div>
+            <div class="total-line"><strong>${t.totalStudents}: ${fmtNum(hallAlloc.length, lang)}</strong></div>
+          </div>
+          <div style="flex:1"></div>
+          <div class="shift-info">
+            <div class="big">${esc(shiftName)}</div>
+            <div>${esc(fmtNum(exam.exam_time || '', lang))}</div>
+          </div>
+          <div class="entry-box">${t.entry}</div>
+        </div>
+        <div class="lcols">${cols}</div>
+      </div>`;
+  }).join('');
+}
+
+function buildPrintableHtml({ exam, allocations, hallSummaries, settings, mode, hallFilter, lang, orientation }) {
+  const isBn = lang === 'bn';
+  const instName = isBn ? (settings.institutionNameBn || settings.institutionName) : settings.institutionName;
+  const shiftName = isBn ? (exam.shift_name_bn || exam.shift_name) : exam.shift_name;
+  const authTeacher = isBn ? (settings.authorizedTeacherNameBn || settings.authorizedTeacherName) : settings.authorizedTeacherName;
+
+  const t = {
+    hallWise: isBn ? 'হলভিত্তিক আসন বিন্যাস' : 'Hall-wise Seat Plan',
+    complete: isBn ? 'সম্পূর্ণ আসন বিন্যাস' : 'Complete Seat Plan',
+    studentWise: isBn ? 'শিক্ষার্থীভিত্তিক আসন বিন্যাস' : 'Student-wise Seat Plan',
+    examDate: isBn ? 'পরীক্ষার তারিখ' : 'Exam Date',
+    shift: isBn ? 'শিফট' : 'Shift',
+    hall: isBn ? 'হল নম্বর' : 'Hall No.',
+    col: isBn ? 'কলাম' : 'Col',
+    row: isBn ? 'সারি' : 'Row',
+    bench: isBn ? 'বেঞ্চ' : 'Bench',
+    seat: isBn ? 'আসন' : 'Seat',
+    roll: isBn ? 'রোল' : 'Roll',
+    name: isBn ? 'শিক্ষার্থীর নাম' : 'Name',
+    cls: isBn ? 'শ্রেণি' : 'Class',
+    totalAllocated: isBn ? 'মোট বরাদ্দকৃত শিক্ষার্থী' : 'Total Allocated Students',
+    totalStudents: isBn ? 'মোট শিক্ষার্থী' : 'Total Student',
+    signature: isBn ? 'অনুমোদিত শিক্ষকের স্বাক্ষর' : 'Authorized Teacher Signature',
+    generatedOn: isBn ? 'তৈরির সময়' : 'Generated on',
+    layout: isBn ? 'রুম লেআউট' : 'Room Layout',
+    entry: isBn ? 'প্রবেশপথ' : 'Entry'
+  };
+
+  const docTitle = mode === 'hall' ? t.hallWise : mode === 'student' ? t.studentWise : mode === 'layout' ? t.layout : t.complete;
+  const targetHalls = mode === 'hall' && hallFilter ? hallSummaries.filter((h) => h.hall_number === hallFilter) : hallSummaries;
+
+  let bodySections = '';
+
+  if (mode === 'layout') {
+    bodySections = buildLayoutSections({ hallSummaries, allocations, hallFilter, lang, t, exam, shiftName, isBn });
+  } else if (mode === 'student') {
+    const sorted = [...allocations].sort((a, b) =>
+      a.student_class_snapshot !== b.student_class_snapshot
+        ? a.student_class_snapshot - b.student_class_snapshot
+        : a.student_roll_snapshot - b.student_roll_snapshot);
+    bodySections = `
+      <div class="summary-bar"><span><strong>${docTitle}</strong></span><span>${t.totalAllocated}: <strong>${fmtNum(sorted.length, lang)}</strong></span></div>
+      <table>
+        <thead><tr><th>#</th><th>${t.cls}</th><th>${t.roll}</th><th>${t.name}</th><th>${t.hall}</th><th>${t.col}</th><th>${t.row}</th><th>${t.bench}</th><th>${t.seat}</th></tr></thead>
+        <tbody>
+          ${sorted.map((item, idx) => `
+            <tr>
+              <td>${fmtNum(idx + 1, lang)}</td><td>${fmtNum(item.student_class_snapshot, lang)}</td>
+              <td><strong>${fmtNum(item.student_roll_snapshot, lang)}</strong></td>
+              <td class="text-left">${esc(item.student_name_snapshot)}</td><td>${esc(item.hall_number)}</td>
+              <td>${fmtNum(item.column_number, lang)}</td><td>${fmtNum(item.row_number, lang)}</td>
+              <td>${fmtNum(item.bench_number, lang)}</td><td>${seatLabel(item.seat_index - 1, item.seats_per_bench, lang)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } else {
+    bodySections = targetHalls.map((h, idx) => {
+      const hallAlloc = allocations.filter((a) => a.hall_number === h.hall_number);
+      const colBreakdown = (h.column_benches || []).map((bCnt, cIdx) => `${t.col} ${fmtNum(cIdx + 1, lang)}: ${fmtNum(bCnt, lang)}`).join(', ');
+      const perClassSummary = formatHallClassBreakdown(hallAlloc, lang, isBn).join(' | ');
+      return `
+        <div class="hall-block ${idx > 0 && mode === 'complete' ? 'page-break' : ''}">
+          <div class="hall-header">
+            <div>
+              <strong>${t.hall}: ${esc(h.hall_number)}</strong>
+              <span class="meta-muted"> (${colBreakdown} | ${t.seat}/${t.bench}: ${fmtNum(h.seats_per_bench, lang)})</span>
+              <div class="hall-class-line">${perClassSummary}</div>
+            </div>
+            <div>${t.totalStudents}: <strong>${fmtNum(hallAlloc.length, lang)}</strong></div>
+          </div>
+          <table>
+            <thead><tr><th>#</th><th>${t.col}</th><th>${t.row}</th><th>${t.bench}</th><th>${t.seat}</th><th>${t.cls}</th><th>${t.roll}</th><th>${t.name}</th></tr></thead>
+            <tbody>
+              ${hallAlloc.map((item, i) => `
+                <tr>
+                  <td>${fmtNum(i + 1, lang)}</td><td>${fmtNum(item.column_number, lang)}</td>
+                  <td>${fmtNum(item.row_number, lang)}</td><td>${fmtNum(item.bench_number, lang)}</td>
+                  <td>${seatLabel(item.seat_index - 1, item.seats_per_bench, lang)}</td>
+                  <td>${fmtNum(item.student_class_snapshot, lang)}</td>
+                  <td><strong>${fmtNum(item.student_roll_snapshot, lang)}</strong></td>
+                  <td class="text-left">${esc(item.student_name_snapshot)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }).join('');
+  }
+
+  const logoHtml = settings.institutionLogo
+    ? `<img src="${esc(settings.institutionLogo)}" alt="Logo" class="logo" />`
+    : `<div class="logo-placeholder">${esc(String(instName).slice(0, 2).toUpperCase())}</div>`;
+
+  const generatedDate = fmtNum(new Date().toLocaleDateString('en-GB'), lang);
+
+  return `<!DOCTYPE html>
+<html lang="${isBn ? 'bn' : 'en'}">
+<head>
+<meta charset="UTF-8" />
+<title>${esc(docTitle)} - ${esc(exam.exam_name)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  @page { size: A4 ${orientation}; margin: 12mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Noto Sans Bengali', 'Inter', sans-serif;
+    margin: 0;
+    padding: 16px;
+    color: #0f172a;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .page-content { flex: 1 0 auto; }
+  .doc-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-bottom: 14px; }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 52px; height: 52px; object-fit: contain; border-radius: 6px; border: 1px solid #cbd5e1; }
+  .logo-placeholder { width: 52px; height: 52px; border-radius: 8px; background: #0f172a; color: #fff; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+  .inst-title { font-size: 18px; font-weight: 700; margin: 0; }
+  .exam-title { font-size: 14px; font-weight: 600; color: #334155; margin: 2px 0 0; }
+  .doc-badge { text-align: right; }
+  .doc-type { font-size: 14px; font-weight: 700; color: #1d4ed8; }
+  .meta-grid { display: flex; flex-wrap: wrap; gap: 16px; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }
+  .hall-header { display: flex; justify-content: space-between; align-items: flex-start; background: #e2e8f0; padding: 7px 10px; border-left: 4px solid #1e293b; margin-top: 12px; margin-bottom: 6px; font-size: 12px; }
+  .hall-class-line { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: #1e293b; }
+  .summary-bar { display: flex; justify-content: space-between; background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; }
+  .meta-muted { color: #475569; font-weight: 400; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: center; font-size: 11.5px; }
+  th { background: #1e293b; color: #fff; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  .text-left { text-align: left; }
+  .page-break { page-break-before: always; break-before: page; }
+  .footer-sig {
+    margin-top: auto;
+    padding-top: 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+  }
+  .sig-box {
+    text-align: center;
+    min-width: 210px;
+    border-top: 1.5px solid #0f172a;
+    padding-top: 6px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .doc-footer { font-size: 10.5px; color: #64748b; }
+  .layout-top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .big { font-size: 16px; font-weight: 700; }
+  .hall-info, .shift-info { flex: 1; line-height: 1.55; }
+  .class-breakdown { margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #0f172a; }
+  .total-line { margin-top: 4px; font-size: 13px; color: #1d4ed8; }
+  .entry-box { flex: 0 0 90px; border: 2px solid #0f172a; border-radius: 0 28px 0 28px; padding: 12px 8px; text-align: center; font-weight: 700; }
+  .lcols { display: flex; gap: 18px; align-items: flex-start; }
+  .lcol { flex: 1; }
+  .lcol-title { text-align: center; font-weight: 700; border-bottom: 2px solid #0f172a; padding-bottom: 4px; margin-bottom: 8px; }
+  .bench { border: 1.5px solid #0f172a; margin-bottom: 10px; padding: 4px 6px; break-inside: avoid; page-break-inside: avoid; }
+  .bench-no { font-size: 10px; color: #64748b; margin-bottom: 2px; }
+  .seats { display: flex; gap: 8px; }
+  .seat { flex: 1; font-size: 11px; line-height: 1.5; padding: 2px 4px; }
+  .seat + .seat { border-left: 1px dashed #94a3b8; }
+  .seat.empty { color: #94a3b8; text-align: center; align-self: center; }
+  @media print {
+    body { padding: 0; min-height: auto; }
+    .footer-sig { padding-top: 28px; }
+  }
+</style>
+</head>
+<body>
+  <div class="page-content">
+    <div class="doc-header">
+      <div class="brand-left">
+        ${logoHtml}
+        <div><h1 class="inst-title">${esc(instName)}</h1><div class="exam-title">${esc(exam.exam_name)}</div></div>
+      </div>
+      <div class="doc-badge">
+        <div class="doc-type">${docTitle}</div>
+        <div>${t.totalAllocated}: <strong>${fmtNum(allocations.length, lang)}</strong></div>
+      </div>
+    </div>
+    <div class="meta-grid">
+      <div><strong>${t.examDate}:</strong> ${esc(fmtNum(exam.exam_date, lang))}</div>
+      <div><strong>${t.shift}:</strong> ${esc(shiftName)}</div>
+      ${exam.exam_time ? `<div><strong>${isBn ? 'সময়' : 'Time'}:</strong> ${esc(fmtNum(exam.exam_time, lang))}</div>` : ''}
+      <div><strong>${t.totalAllocated}:</strong> ${fmtNum(allocations.length, lang)}</div>
+    </div>
+    ${bodySections}
+  </div>
+
+  <div class="footer-sig">
+    <div class="doc-footer"><span>${t.generatedOn}: ${generatedDate}</span></div>
+    <div class="sig-box">
+      <div>${esc(authTeacher)}</div>
+      <div style="font-size:10.5px; color:#475569; font-weight:400;">${t.signature}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function openPrintPdfWindow(htmlStr) {
+  const win = window.open('', '_blank', 'width=960,height=720');
+  if (!win) { alert('Please allow pop-ups in your browser to open and save/print the PDF.'); return; }
+  win.document.open();
+  win.document.write(htmlStr);
+  win.document.close();
+  win.focus();
+  let printed = false;
+  const go = () => {
+    if (printed) return;
+    printed = true;
+    try { win.focus(); win.print(); } catch (e) { console.warn(e); }
+  };
+  const afterLoad = () => {
+    const fonts = win.document.fonts;
+    if (fonts && fonts.ready) fonts.ready.then(() => setTimeout(go, 300));
+    else setTimeout(go, 800);
+  };
+  if (win.document.readyState === 'complete') afterLoad();
+  else win.addEventListener('load', afterLoad);
+  setTimeout(go, 4000); // safety fallback
+}
+
+function App() {
+  const [activeTab, setActiveTab] = useState('students');
+  const [students, setStudents] = useState(() => loadLS(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS));
+  const [examinations, setExaminations] = useState(() => loadLS(STORAGE_KEYS.EXAMS, []));
+  const [settings, setSettings] = useState(() => ({ ...INITIAL_SETTINGS, ...loadLS(STORAGE_KEYS.SETTINGS, {}) }));
+  const [saveWarning, setSaveWarning] = useState('');
+
+  useEffect(() => { setSaveWarning(saveLS(STORAGE_KEYS.STUDENTS, students) ? '' : 'Could not save students (browser storage full or blocked).'); }, [students]);
+  useEffect(() => { setSaveWarning(saveLS(STORAGE_KEYS.EXAMS, examinations) ? '' : 'Could not save exam history (browser storage full or blocked).'); }, [examinations]);
+  useEffect(() => { setSaveWarning(saveLS(STORAGE_KEYS.SETTINGS, settings) ? '' : 'Could not save settings. The logo may be too large.'); }, [settings]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [classFilter, setClassFilter] = useState('ALL');
+  const [sortRollAsc, setSortRollAsc] = useState(true);
+  const [stuForm, setStuForm] = useState({ id: null, name: '', roll: '', class: 1 });
+  const [stuError, setStuError] = useState('');
+  const [importReport, setImportReport] = useState(null);
+
+  const [examMeta, setExamMeta] = useState({
+    exam_name: 'Half-Yearly Examination 2026',
+    exam_date: todayLocal(),
+    shift_name: 'Morning Shift',
+    shift_name_bn: 'সকালের শিফট',
+    exam_time: '8:00 - 11:00',
+    pattern: 'z_serial'
+  });
+  const [selectedClasses, setSelectedClasses] = useState([1, 2, 3, 4, 5]);
+  const [excludedIds, setExcludedIds] = useState([]);
+  const [hallsConfig, setHallsConfig] = useState([
+    {
+      id: 'h-1', hall_number: 'Hall 101', total_rows: 1, column_count: 2, column_benches: [4, 4], seats_per_bench: 2,
+      assigned_classes: [1, 5], fallback_classes: [2, 3, 4], middle_classes: [], middle_class: '', middle_fallback_class: ''
+    },
+    {
+      id: 'h-2', hall_number: 'Hall 102', total_rows: 1, column_count: 2, column_benches: [4, 4], seats_per_bench: 2,
+      assigned_classes: [2, 4], fallback_classes: [1, 3, 5], middle_classes: [], middle_class: '', middle_fallback_class: ''
+    }
+  ]);
+  const [generatedPlan, setGeneratedPlan] = useState(null);
+  const [previewState, setPreviewState] = useState({
+    open: false, exam: null, allocations: [], hallSummaries: [], mode: 'complete', hallFilter: '', lang: 'en', orientation: 'portrait'
+  });
+
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyDate, setHistoryDate] = useState('');
+  const [selectedHistoryExam, setSelectedHistoryExam] = useState(null);
+
+  const classCounts = useMemo(() => {
+    const counts = {};
+    CLASSES.forEach((c) => (counts[c] = 0));
+    students.forEach((s) => { const c = Number(s.class); if (counts[c] !== undefined) counts[c] += 1; });
+    return counts;
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    return students
+      .filter((s) => {
+        if (classFilter !== 'ALL' && Number(s.class) !== Number(classFilter)) return false;
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return String(s.name).toLowerCase().includes(q) || String(s.roll).toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        if (classFilter === 'ALL' && Number(a.class) !== Number(b.class)) return Number(a.class) - Number(b.class);
+        return sortRollAsc ? Number(a.roll) - Number(b.roll) : Number(b.roll) - Number(a.roll);
+      });
+  }, [students, searchQuery, classFilter, sortRollAsc]);
+
+  const handleSaveStudent = (e) => {
+    e.preventDefault();
+    setStuError('');
+    const cleanName = stuForm.name.trim();
+    const rollNum = Number(toEnglishDigits(stuForm.roll));
+    const clsNum = Number(stuForm.class);
+    if (!cleanName) { setStuError('Student Name is required.'); return; }
+    if (!Number.isInteger(rollNum) || rollNum <= 0) { setStuError('Roll Number must be a positive integer.'); return; }
+    if (!Number.isInteger(clsNum) || clsNum < 1 || clsNum > 10) { setStuError('Class must be between 1 and 10.'); return; }
+    const duplicate = students.find((s) => Number(s.class) === clsNum && Number(s.roll) === rollNum && s.id !== stuForm.id);
+    if (duplicate) { setStuError(`Duplicate Roll ${rollNum} in Class ${clsNum} (${duplicate.name}).`); return; }
+
+    const now = new Date().toISOString();
+    if (stuForm.id) {
+      setStudents((prev) => prev.map((s) => (s.id === stuForm.id ? { ...s, name: cleanName, roll: rollNum, class: clsNum, updated_at: now } : s)));
+    } else {
+      setStudents((prev) => [...prev, {
+        id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: cleanName, roll: rollNum, class: clsNum, created_at: now, updated_at: now
+      }]);
+    }
+    setStuForm({ id: null, name: '', roll: '', class: clsNum });
+  };
+
+  const handleDeleteStudent = (student) => {
+    if (window.confirm(`Delete "${student.name}" (Class ${student.class}, Roll ${student.roll})?`)) {
+      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+      setExcludedIds((prev) => prev.filter((x) => x !== student.id));
+      if (stuForm.id === student.id) setStuForm({ id: null, name: '', roll: '', class: 1 });
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    if (!window.XLSX) { alert('Excel library is still loading. Please try again in a moment.'); return; }
+    const ws = window.XLSX.utils.aoa_to_sheet([['Name', 'Roll', 'Class'], ['Sample Student One', 1, 1], ['Sample Student Two', 2, 1]]);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'StudentsTemplate');
+    window.XLSX.writeFile(wb, 'student_import_template.xlsx');
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !window.XLSX) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = window.XLSX.read(data, { type: 'array' });
+        const rawRows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+        // normalize header names (case-insensitive, trimmed)
+        const rows = rawRows.map((r) => {
+          const o = {};
+          Object.keys(r).forEach((k) => { o[String(k).trim().toLowerCase()] = r[k]; });
+          return o;
+        });
+        let addedCount = 0;
+        const errors = [];
+        const workingList = [...students];
+        const now = new Date().toISOString();
+
+        rows.forEach((row, index) => {
+          const rowNum = index + 2;
+          const rawName = String(row.name ?? '').trim();
+          const rawRoll = row.roll ?? '';
+          const rawClass = row.class ?? '';
+          if (!rawName || rawRoll === '' || rawClass === '') { errors.push(`Row ${rowNum}: Missing required field (Name, Roll, or Class).`); return; }
+          const rollNum = Number(toEnglishDigits(String(rawRoll).trim()));
+          const clsNum = Number(toEnglishDigits(String(rawClass).trim()));
+          if (!Number.isInteger(rollNum) || rollNum <= 0) { errors.push(`Row ${rowNum} (${rawName}): Invalid Roll "${rawRoll}".`); return; }
+          if (!Number.isInteger(clsNum) || clsNum < 1 || clsNum > 10) { errors.push(`Row ${rowNum} (${rawName}): Invalid Class "${rawClass}" (must be 1–10).`); return; }
+          if (workingList.some((s) => Number(s.class) === clsNum && Number(s.roll) === rollNum)) {
+            errors.push(`Row ${rowNum} (${rawName}): Duplicate Roll ${rollNum} in Class ${clsNum}.`); return;
+          }
+          workingList.push({
+            id: `stu-${Date.now()}-${rowNum}-${Math.random().toString(36).slice(2, 5)}`,
+            name: rawName, roll: rollNum, class: clsNum, created_at: now, updated_at: now
+          });
+          addedCount += 1;
+        });
+
+        setStudents(workingList);
+        setImportReport({ fileName: file.name, totalRows: rows.length, addedCount, errors });
+      } catch (err) {
+        setImportReport({ fileName: file.name, totalRows: 0, addedCount: 0, errors: [`Failed to parse file: ${err.message}`] });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const toggleClassSelection = (cls) => {
+    setSelectedClasses((prev) => (prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls].sort((a, b) => a - b)));
+    setGeneratedPlan(null);
+  };
+  const toggleExcludeStudent = (id) => {
+    setExcludedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setGeneratedPlan(null);
+  };
+
+  const fetchedStudents = useMemo(() => {
+    return students
+      .filter((s) => selectedClasses.includes(Number(s.class)))
+      .sort((a, b) => (Number(a.class) !== Number(b.class) ? Number(a.class) - Number(b.class) : Number(a.roll) - Number(b.roll)));
+  }, [students, selectedClasses]);
+
+  const activeSelectedStudents = useMemo(() => fetchedStudents.filter((s) => !excludedIds.includes(s.id)), [fetchedStudents, excludedIds]);
+
+  const addHall = () => {
+    setHallsConfig((prev) => {
+      let n = 101 + prev.length;
+      const used = new Set(prev.map((h) => String(h.hall_number).trim()));
+      while (used.has(`Hall ${n}`)) n++;
+      return [...prev, {
+        id: `h-${Date.now()}`, hall_number: `Hall ${n}`, total_rows: 1, column_count: 2, column_benches: [4, 4], seats_per_bench: 2,
+        assigned_classes: [...selectedClasses], fallback_classes: [], middle_classes: [], middle_class: '', middle_fallback_class: ''
+      }];
+    });
+    setGeneratedPlan(null);
+  };
+  const removeHall = (idx) => {
+    if (hallsConfig.length <= 1) return;
+    setHallsConfig((prev) => prev.filter((_, i) => i !== idx));
+    setGeneratedPlan(null);
+  };
+  const updateHallField = (idx, field, value) => {
+    setHallsConfig((prev) => prev.map((h, i) => {
+      if (i !== idx) return h;
+      if (field === 'column_count') {
+        if (value === '') return { ...h, column_count: '' };
+        const parsed = parseInt(value, 10);
+        if (isNaN(parsed)) return { ...h, column_count: '' };
+        const n = Math.min(10, Math.max(1, parsed));
+        const nextBenches = [];
+        for (let c = 0; c < n; c++) nextBenches.push(h.column_benches?.[c] ?? 4);
+        return { ...h, column_count: n, column_benches: nextBenches };
+      }
+      return { ...h, [field]: value };
+    }));
+    setGeneratedPlan(null);
+  };
+  const toggleHallClass = (hallIdx, fieldName, cls) => {
+    setHallsConfig((prev) => prev.map((h, i) => {
+      if (i !== hallIdx) return h;
+      const cur = Array.isArray(h[fieldName]) ? h[fieldName] : [];
+      const next = cur.includes(cls) ? cur.filter((x) => x !== cls) : [...cur, cls].sort((a, b) => a - b);
+      return { ...h, [fieldName]: next };
+    }));
+    setGeneratedPlan(null);
+  };
+  const updateColumnBenchCount = (hallIdx, colIdx, val) => {
+    setHallsConfig((prev) => prev.map((h, i) => {
+      if (i !== hallIdx) return h;
+      const next = [...(h.column_benches || [])];
+      if (val === '') {
+        next[colIdx] = '';
+      } else {
+        const parsed = parseInt(val, 10);
+        next[colIdx] = isNaN(parsed) ? '' : Math.max(1, Math.min(100, parsed));
+      }
+      return { ...h, column_benches: next };
+    }));
+    setGeneratedPlan(null);
+  };
+
+  const handleGeneratePlan = () => {
+    if (!examMeta.exam_name.trim()) { alert('Please enter an Examination Name.'); return; }
+    if (activeSelectedStudents.length === 0) { alert('Please select at least one class with active students.'); return; }
+    const names = hallsConfig.map((h) => String(h.hall_number).trim());
+    if (names.some((n) => !n)) { alert('Hall number cannot be empty.'); return; }
+    if (new Set(names).size !== names.length) { alert('Hall numbers must be unique.'); return; }
+    setGeneratedPlan(allocateSeats(activeSelectedStudents, hallsConfig, examMeta.pattern));
+  };
+
+  const handleFinalizePlan = () => {
+    if (!generatedPlan || generatedPlan.allocations.length === 0) return;
+    const now = new Date().toISOString();
+    const finalizedExam = {
+      id: `exam-${Date.now()}`,
+      institution_name: settings.institutionName,
+      institution_name_bn: settings.institutionNameBn,
+      exam_name: examMeta.exam_name.trim(),
+      exam_date: examMeta.exam_date,
+      shift_name: examMeta.shift_name,
+      shift_name_bn: examMeta.shift_name_bn,
+      exam_time: examMeta.exam_time,
+      pattern: examMeta.pattern,
+      status: 'FINALIZED',
+      created_at: now,
+      finalized_at: now,
+      halls: generatedPlan.hallSummaries,
+      allocations: generatedPlan.allocations
+    };
+    setExaminations((prev) => [finalizedExam, ...prev]);
+    setSelectedHistoryExam(finalizedExam);
+    setActiveTab('history');
+  };
+
+  const handleDeleteExam = (ex) => {
+    if (!window.confirm(`Delete examination "${ex.exam_name}" (${ex.exam_date}) from history? This cannot be undone.`)) return;
+    setExaminations((prev) => prev.filter((x) => x.id !== ex.id));
+    if (selectedHistoryExam?.id === ex.id) setSelectedHistoryExam(null);
+  };
+
+  const openPreviewModal = (examObj, hallSummariesObj, allocationsObj, mode = 'complete', hallFilter = '') => {
+    setPreviewState({
+      open: true, exam: examObj, hallSummaries: hallSummariesObj, allocations: allocationsObj, mode,
+      hallFilter: hallFilter || (hallSummariesObj[0]?.hall_number || ''),
+      lang: 'en',
+      orientation: mode === 'layout' ? 'landscape' : 'portrait'
+    });
+  };
+
+  const filteredHistory = useMemo(() => {
+    return examinations.filter((ex) => {
+      if (historyDate && ex.exam_date !== historyDate) return false;
+      if (historySearch.trim() && !ex.exam_name.toLowerCase().includes(historySearch.toLowerCase())) return false;
+      return true;
+    });
+  }, [examinations, historySearch, historyDate]);
+
+  const currentPreviewHtml = useMemo(() => {
+    if (!previewState.open || !previewState.exam) return '';
+    return buildPrintableHtml({
+      exam: previewState.exam, allocations: previewState.allocations, hallSummaries: previewState.hallSummaries,
+      settings, mode: previewState.mode, hallFilter: previewState.hallFilter, lang: previewState.lang, orientation: previewState.orientation
+    });
+  }, [previewState, settings]);
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setActiveTab(id)}
+      className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${activeTab === id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
+      {label}
+    </button>
+  );
+
+  const modeBtn = (mode, label, extra = {}) => (
+    <button type="button" onClick={() => setPreviewState((p) => ({ ...p, mode, ...extra }))}
+      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${previewState.mode === mode ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
+      {label}
+    </button>
+  );
+
+  const allocTable = (rows, nameHead) => (
+    <table className="w-full text-xs border-collapse">
+      <thead>
+        <tr className="bg-slate-100 text-slate-700 text-left">
+          {['Hall', 'Col', 'Row', 'Bench', 'Seat', 'Class', 'Roll', nameHead].map((h) => <th key={h} className="p-2 border">{h}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((a) => (
+          <tr key={a.id} className="hover:bg-slate-50">
+            <td className="p-2 border font-semibold">{a.hall_number}</td>
+            <td className="p-2 border">{a.column_number}</td>
+            <td className="p-2 border">{a.row_number}</td>
+            <td className="p-2 border">{a.bench_number}</td>
+            <td className="p-2 border">{seatLabel(a.seat_index - 1, a.seats_per_bench, 'en')}</td>
+            <td className="p-2 border">Class {a.student_class_snapshot}</td>
+            <td className="p-2 border font-bold text-blue-700">{a.student_roll_snapshot}</td>
+            <td className="p-2 border font-bangla">{a.student_name_snapshot}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {settings.institutionLogo ? (
+              <img src={settings.institutionLogo} alt="Logo" className="w-10 h-10 rounded-lg object-cover bg-white" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-lg">SP</div>
+            )}
+            <div>
+              <h1 className="font-bold text-base sm:text-lg leading-tight">Student Database & Seat Plan System</h1>
+              <p className="text-xs text-slate-300 font-bangla">{settings.institutionName} • {settings.institutionNameBn}</p>
+            </div>
+          </div>
+          <nav className="flex items-center gap-1.5 sm:gap-2">
+            {tabBtn('students', `Student Database (${students.length})`)}
+            {tabBtn('generator', 'Create Seat Plan')}
+            {tabBtn('history', `Exam History (${examinations.length})`)}
+            {tabBtn('settings', 'Settings')}
+          </nav>
+        </div>
+        {saveWarning && <div className="bg-amber-500 text-slate-900 text-xs font-semibold px-4 py-1.5 text-center">{saveWarning}</div>}
+      </header>
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Student Management</h2>
+                  <p className="text-xs text-slate-500">Permanent storage active • Total Students: <strong>{students.length}</strong></p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={handleDownloadTemplate} className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition">
+                    Download Excel Template (.xlsx)
+                  </button>
+                  <label className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer transition">
+                    Bulk Import (.xlsx / .csv)
+                    <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                {CLASSES.map((cls) => (
+                  <div key={cls} className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+                    <div className="text-[11px] text-slate-500">Class {cls}</div>
+                    <div className="text-sm font-bold text-slate-800">{classCounts[cls]}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {importReport && (
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-slate-800 text-sm">Import Report: {importReport.fileName}</h3>
+                  <button onClick={() => setImportReport(null)} className="text-xs text-slate-500 hover:text-slate-800">Dismiss</button>
+                </div>
+                <p className="text-xs text-slate-700 mb-2">
+                  Processed rows: <strong>{importReport.totalRows}</strong> • Successfully added:{' '}
+                  <strong className="text-emerald-700">{importReport.addedCount}</strong> • Errors:{' '}
+                  <strong className="text-rose-700">{importReport.errors.length}</strong>
+                </p>
+                {importReport.errors.length > 0 && (
+                  <ul className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-800 space-y-1 max-h-40 overflow-y-auto">
+                    {importReport.errors.map((err, i) => <li key={i}>• {err}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm h-fit">
+                <h3 className="font-bold text-slate-800 mb-4">{stuForm.id ? 'Edit Student' : 'Add New Student'}</h3>
+                <form onSubmit={handleSaveStudent} className="space-y-3.5">
+                  <div>
+                    <label className={LBL}>1. Student Name *</label>
+                    <input type="text" value={stuForm.name} onChange={(e) => setStuForm({ ...stuForm, name: e.target.value })}
+                      placeholder="e.g., Rafiqul Islam / রফিকুল ইসলাম" className={INP} />
+                  </div>
+                  <div>
+                    <label className={LBL}>2. Roll Number *</label>
+                    <input type="number" min="1" value={stuForm.roll} onChange={(e) => setStuForm({ ...stuForm, roll: e.target.value })}
+                      placeholder="e.g., 1" className={INP} />
+                  </div>
+                  <div>
+                    <label className={LBL}>3. Class (1–10) *</label>
+                    <select value={stuForm.class} onChange={(e) => setStuForm({ ...stuForm, class: Number(e.target.value) })} className={INP}>
+                      {CLASSES.map((c) => <option key={c} value={c}>Class {c}</option>)}
+                    </select>
+                  </div>
+                  {stuError && <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">{stuError}</div>}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button type="submit" className="flex-1 py-2 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+                      {stuForm.id ? 'Update Student' : 'Save Student'}
+                    </button>
+                    {stuForm.id && (
+                      <button type="button" onClick={() => { setStuForm({ id: null, name: '', roll: '', class: 1 }); setStuError(''); }}
+                        className="py-2 px-3 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300">Cancel</button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name or roll number..." className="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    <option value="ALL">All Classes (1–10)</option>
+                    {CLASSES.map((c) => <option key={c} value={c}>Class {c}</option>)}
+                  </select>
+                  <button onClick={() => setSortRollAsc((p) => !p)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    Roll: {sortRollAsc ? 'Asc ↑' : 'Desc ↓'}
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 text-left">
+                        <th className="p-2.5 border-b">Class</th><th className="p-2.5 border-b">Roll</th>
+                        <th className="p-2.5 border-b">Student Name</th><th className="p-2.5 border-b text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.length === 0 ? (
+                        <tr><td colSpan="4" className="p-6 text-center text-slate-400">No students found matching your filter.</td></tr>
+                      ) : filteredStudents.map((stu) => (
+                        <tr key={stu.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                          <td className="p-2.5 font-medium">Class {stu.class}</td>
+                          <td className="p-2.5 font-bold text-blue-700">{stu.roll}</td>
+                          <td className="p-2.5 font-bangla">{stu.name}</td>
+                          <td className="p-2.5 text-right space-x-2">
+                            <button onClick={() => { setStuError(''); setStuForm({ id: stu.id, name: stu.name, roll: stu.roll, class: stu.class }); }}
+                              className="px-2.5 py-1 rounded bg-amber-100 text-amber-800 text-xs font-semibold hover:bg-amber-200">Edit</button>
+                            <button onClick={() => handleDeleteStudent(stu)}
+                              className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 text-xs font-semibold hover:bg-rose-200">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'generator' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-slate-800">Examination Details & Seating Pattern</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div>
+                  <label className={LBL}>Examination Name *</label>
+                  <input type="text" value={examMeta.exam_name} onChange={(e) => setExamMeta({ ...examMeta, exam_name: e.target.value })} className={INP} />
+                </div>
+                <div>
+                  <label className={LBL}>Examination Date *</label>
+                  <input type="date" value={examMeta.exam_date} onChange={(e) => setExamMeta({ ...examMeta, exam_date: e.target.value })} className={INP} />
+                </div>
+                <div>
+                  <label className={LBL}>Shift Name (English)</label>
+                  <input type="text" value={examMeta.shift_name} onChange={(e) => setExamMeta({ ...examMeta, shift_name: e.target.value })} className={INP} />
+                </div>
+                <div>
+                  <label className={LBL}>শিফটের নাম (বাংলা)</label>
+                  <input type="text" value={examMeta.shift_name_bn} onChange={(e) => setExamMeta({ ...examMeta, shift_name_bn: e.target.value })} className={INP + ' font-bangla'} />
+                </div>
+                <div>
+                  <label className={LBL}>Exam Time</label>
+                  <input type="text" value={examMeta.exam_time} onChange={(e) => setExamMeta({ ...examMeta, exam_time: e.target.value })}
+                    placeholder="8:00 - 11:00" className={INP} />
+                </div>
+                <div>
+                  <label className={LBL}>Seating Pattern (Z-Style / L-Style)</label>
+                  <select value={examMeta.pattern} onChange={(e) => { setExamMeta({ ...examMeta, pattern: e.target.value }); setGeneratedPlan(null); }}
+                    className={INP + ' font-medium'}>
+                    <option value="z_serial">1. Z-Style (Serial Roll)</option>
+                    <option value="l_serial">2. L-Style (Serial Roll, Side-by-Side Class)</option>
+                    <option value="z_mix">3. Z-Style (Roll Mix / Random)</option>
+                    <option value="l_mix">4. L-Style (Roll Mix / Random)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-slate-800">Automatic Student Fetching by Class</h3>
+                  <p className="text-xs text-slate-500">Select classes to automatically pull students from the database. Uncheck any student to exclude.</p>
+                </div>
+                <div className="text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                  Selected Students: {activeSelectedStudents.length} / {fetchedStudents.length}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {CLASSES.map((cls) => (
+                  <button key={cls} type="button" onClick={() => toggleClassSelection(cls)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${selectedClasses.includes(cls) ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'}`}>
+                    Class {cls} ({classCounts[cls]})
+                  </button>
+                ))}
+              </div>
+              {fetchedStudents.length > 0 && (
+                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2.5 bg-slate-50 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {fetchedStudents.map((stu) => {
+                    const isExcluded = excludedIds.includes(stu.id);
+                    return (
+                      <label key={stu.id}
+                        className={`flex items-center justify-between px-3 py-1.5 rounded border text-xs cursor-pointer ${isExcluded ? 'bg-rose-50 border-rose-200 text-rose-500 line-through' : 'bg-white border-slate-200 text-slate-800'}`}>
+                        <span className="truncate font-bangla"><strong>C{stu.class} • R{stu.roll}:</strong> {stu.name}</span>
+                        <input type="checkbox" checked={!isExcluded} onChange={() => toggleExcludeStudent(stu.id)} className="ml-2" />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-800">Hall-wise Class Selection, Columns, Benches & 3-Seat Middle Class</h3>
+                  <p className="text-xs text-slate-500">
+                    Pick primary classes per hall, set 3rd-choice classes, configure column bench counts, and assign ordered classes for middle seats on 3-seat benches.
+                  </p>
+                </div>
+                <button type="button" onClick={addHall} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900">+ Add Hall</button>
+              </div>
+
+              <div className="space-y-4">
+                {hallsConfig.map((hall, hIdx) => (
+                  <div key={hall.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3.5">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="w-36">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Hall Number</label>
+                        <input type="text" value={hall.hall_number} onChange={(e) => updateHallField(hIdx, 'hall_number', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-sm" />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Total Columns</label>
+                        <input type="number" min="1" max="10" value={hall.column_count}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => updateHallField(hIdx, 'column_count', e.target.value)}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (isNaN(val) || val < 1) updateHallField(hIdx, 'column_count', 1);
+                          }}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-sm font-semibold" />
+                      </div>
+                      <div className="w-36">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Seats per Bench</label>
+                        <select value={hall.seats_per_bench} onChange={(e) => updateHallField(hIdx, 'seats_per_bench', Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-sm font-semibold">
+                          <option value={1}>1 Seat / Bench</option>
+                          <option value={2}>2 Seats / Bench</option>
+                          <option value={3}>3 Seats / Bench</option>
+                        </select>
+                      </div>
+                      {Number(hall.seats_per_bench) === 3 && (
+                        <div className="w-full bg-blue-50/70 border border-blue-200 rounded-lg p-2.5 space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-blue-900">
+                              Middle Seat Classes in Sequence (Click in order — e.g., Class 1 then Class 2):
+                            </span>
+                            {(hall.middle_classes || []).length > 0 && (
+                              <button type="button" onClick={() => {
+                                setHallsConfig((prev) => prev.map((h, i) => i === hIdx ? { ...h, middle_classes: [], middle_class: '', middle_fallback_class: '' } : h));
+                                setGeneratedPlan(null);
+                              }} className="text-[11px] font-semibold text-rose-700 hover:underline">Clear Middle Order</button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedClasses.map((c) => {
+                              const mList = Array.isArray(hall.middle_classes) ? hall.middle_classes.map(Number) : [];
+                              const pos = mList.indexOf(Number(c));
+                              const isPicked = pos !== -1;
+                              return (
+                                <button key={c} type="button" onClick={() => {
+                                  setHallsConfig((prev) => prev.map((h, i) => {
+                                    if (i !== hIdx) return h;
+                                    const cur = Array.isArray(h.middle_classes) ? h.middle_classes.map(Number) : [];
+                                    const next = cur.includes(Number(c))
+                                      ? cur.filter((x) => x !== Number(c))
+                                      : [...cur, Number(c)];
+                                    return {
+                                      ...h,
+                                      middle_classes: next,
+                                      middle_class: next[0] ? String(next[0]) : '',
+                                      middle_fallback_class: next[1] ? String(next[1]) : ''
+                                    };
+                                  }));
+                                  setGeneratedPlan(null);
+                                }} className={`px-2.5 py-1 rounded text-xs font-semibold border transition ${isPicked ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-slate-700 border-blue-300 hover:bg-blue-100'}`}>
+                                  Class {c} {isPicked ? `(#${pos + 1})` : ''}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {(hall.middle_classes || []).length > 0 && (
+                            <div className="text-[11px] text-blue-800 font-medium">
+                              Order: {(hall.middle_classes || []).map((c, idx) => `${idx + 1}. Class ${c}`).join(' → ')} (exhausts each class across halls in order)
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {hallsConfig.length > 1 && (
+                        <button type="button" onClick={() => removeHall(hIdx)}
+                          className="ml-auto px-2.5 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-semibold hover:bg-rose-200">Remove Hall</button>
+                      )}
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-700">
+                        Hall Main Classes (Mix in this hall — e.g., Class 1 & 5):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedClasses.map((cls) => {
+                          const active = (hall.assigned_classes || []).includes(cls);
+                          return (
+                            <button key={cls} type="button" onClick={() => toggleHallClass(hIdx, 'assigned_classes', cls)}
+                              className={`px-2.5 py-1 rounded text-xs font-semibold border ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-700 border-slate-300'}`}>
+                              Class {cls}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="text-[11px] font-bold text-slate-600 pt-1">
+                        3rd Choice / Overflow Classes (Used only if main classes run out):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedClasses.map((cls) => {
+                          const active = (hall.fallback_classes || []).includes(cls);
+                          return (
+                            <button key={cls} type="button" onClick={() => toggleHallClass(hIdx, 'fallback_classes', cls)}
+                              className={`px-2.5 py-1 rounded text-xs font-semibold border ${active ? 'bg-amber-600 text-white border-amber-600' : 'bg-slate-50 text-slate-600 border-slate-300'}`}>
+                              Class {cls}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                      {(hall.column_benches || []).map((bCount, cIdx) => (
+                        <div key={cIdx} className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-700">Column {cIdx + 1} Benches:</span>
+                          <input type="number" min="1" max="100" value={bCount}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => updateColumnBenchCount(hIdx, cIdx, e.target.value)}
+                            onBlur={(e) => {
+                              const parsed = parseInt(e.target.value, 10);
+                              if (isNaN(parsed) || parsed < 1) updateColumnBenchCount(hIdx, cIdx, 1);
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-300 rounded text-xs font-bold text-center" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button type="button" onClick={handleGeneratePlan} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">Generate Seat Plan</button>
+                {generatedPlan && generatedPlan.allocations.length > 0 && (
+                  <button type="button" onClick={handleFinalizePlan} className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition">Finalize & Save to History</button>
+                )}
+              </div>
+            </div>
+
+            {generatedPlan && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-slate-800">Generated Allocation ({generatedPlan.allocations.length} seats allocated)</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {generatedPlan.hallSummaries.map((hs) => (
+                        <span key={hs.id} className="text-xs bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md text-slate-700">
+                          <strong>{hs.hall_number}:</strong>{' '}
+                          {Object.entries(hs.class_breakdown || {}).map(([c, cnt]) => `Class ${c} = ${cnt}`).join(', ') || '0'}
+                          {' '}• <strong>Total = {hs.allocated_count}</strong>
+                        </span>
+                      ))}
+                    </div>
+                    {generatedPlan.unallocated.length > 0 && (
+                      <p className="text-xs text-amber-700 font-medium mt-1">Warning: {generatedPlan.unallocated.length} student(s) could not fit in the current halls. Click '+ Add Hall' and generate again.</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[['hall', 'Preview Hall-wise PDF', 'bg-slate-800 hover:bg-slate-900'],
+                      ['complete', 'Preview Complete PDF', 'bg-blue-600 hover:bg-blue-700'],
+                      ['student', 'Preview Student-wise PDF', 'bg-indigo-600 hover:bg-indigo-700'],
+                      ['layout', 'Preview Room Layout PDF', 'bg-emerald-600 hover:bg-emerald-700']].map(([m, label, cls]) => (
+                      <button key={m} type="button"
+                        onClick={() => openPreviewModal({ ...settings, ...examMeta }, generatedPlan.hallSummaries, generatedPlan.allocations, m)}
+                        className={`px-3 py-1.5 rounded-lg text-white text-xs font-semibold ${cls}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-96">{allocTable(generatedPlan.allocations, 'Student Name')}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Permanent Examination History</h2>
+                  <p className="text-xs text-slate-500">Snapshots preserve exact student allocations even if the Student Database changes later.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input type="text" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Search by examination name..." className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                  <input type="date" value={historyDate} onChange={(e) => setHistoryDate(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                </div>
+              </div>
+
+              {filteredHistory.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">No finalized examinations found yet. Generate and finalize a seat plan to save it permanently.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredHistory.map((ex) => (
+                    <div key={ex.id} className={`border rounded-xl p-4 space-y-3 transition ${selectedHistoryExam?.id === ex.id ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
+                      <div>
+                        <div className="text-xs text-slate-500">{ex.exam_date} • {ex.shift_name}{ex.exam_time ? ` • ${ex.exam_time}` : ''}</div>
+                        <h3 className="font-bold text-slate-800 text-base">{ex.exam_name}</h3>
+                        <div className="text-xs text-slate-600 mt-1">
+                          Allocated Seats: <strong>{ex.allocations?.length || 0}</strong> • Halls: <strong>{ex.halls?.length || 0}</strong>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button type="button" onClick={() => setSelectedHistoryExam(ex)} className="px-2.5 py-1 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900">View Allocations</button>
+                        {[['hall', 'Hall PDF', 'bg-slate-200 text-slate-800 hover:bg-slate-300'],
+                          ['complete', 'Complete PDF', 'bg-blue-100 text-blue-800 hover:bg-blue-200'],
+                          ['student', 'Student PDF', 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'],
+                          ['layout', 'Layout PDF', 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200']].map(([m, label, cls]) => (
+                          <button key={m} type="button" onClick={() => openPreviewModal(ex, ex.halls || [], ex.allocations || [], m)}
+                            className={`px-2.5 py-1 rounded text-xs font-semibold ${cls}`}>{label}</button>
+                        ))}
+                        <button type="button" onClick={() => handleDeleteExam(ex)}
+                          className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 text-xs font-semibold hover:bg-rose-200">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {selectedHistoryExam && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-bold text-slate-800">Snapshot Allocations: {selectedHistoryExam.exam_name} ({selectedHistoryExam.exam_date})</h3>
+                  <button type="button" onClick={() => setSelectedHistoryExam(null)} className="text-xs text-slate-500 hover:text-slate-800">Close</button>
+                </div>
+                <div className="overflow-x-auto max-h-80">{allocTable(selectedHistoryExam.allocations || [], 'Student Name (Snapshot)')}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm max-w-2xl space-y-4">
+            <h2 className="text-lg font-bold text-slate-800">Institution & PDF Settings</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={LBL}>Institution Name (English)</label>
+                <input type="text" value={settings.institutionName} onChange={(e) => setSettings({ ...settings, institutionName: e.target.value })} className={INP} />
+              </div>
+              <div>
+                <label className={LBL}>প্রতিষ্ঠানের নাম (বাংলা)</label>
+                <input type="text" value={settings.institutionNameBn} onChange={(e) => setSettings({ ...settings, institutionNameBn: e.target.value })} className={INP + ' font-bangla'} />
+              </div>
+              <div>
+                <label className={LBL}>Authorized Teacher (English)</label>
+                <input type="text" value={settings.authorizedTeacherName} onChange={(e) => setSettings({ ...settings, authorizedTeacherName: e.target.value })} className={INP} />
+              </div>
+              <div>
+                <label className={LBL}>অনুমোদিত শিক্ষক (বাংলা)</label>
+                <input type="text" value={settings.authorizedTeacherNameBn} onChange={(e) => setSettings({ ...settings, authorizedTeacherNameBn: e.target.value })} className={INP + ' font-bangla'} />
+              </div>
+            </div>
+            <div>
+              <label className={LBL}>Institution Logo (max 200 KB)</label>
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" className="text-xs" onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  if (f.size > MAX_LOGO_BYTES) { alert('Logo is too large. Please choose an image under 200 KB.'); return; }
+                  const r = new FileReader();
+                  r.onload = () => setSettings((prev) => ({ ...prev, institutionLogo: String(r.result) }));
+                  r.readAsDataURL(f);
+                }} />
+                {settings.institutionLogo && (
+                  <button type="button" onClick={() => setSettings((prev) => ({ ...prev, institutionLogo: '' }))}
+                    className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 text-xs font-semibold hover:bg-rose-200">Remove Logo</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {previewState.open && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-3 sm:p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {modeBtn('hall', 'A. Hall-wise')}
+                {modeBtn('complete', 'B. Complete')}
+                {modeBtn('student', 'C. Student-wise')}
+                {modeBtn('layout', 'D. Room Layout', { orientation: 'landscape' })}
+                {(previewState.mode === 'hall' || previewState.mode === 'layout') && (
+                  <select value={previewState.hallFilter} onChange={(e) => setPreviewState((p) => ({ ...p, hallFilter: e.target.value }))}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-xs border border-slate-700">
+                    <option value="">All Halls</option>
+                    {previewState.hallSummaries.map((h) => <option key={h.hall_number} value={h.hall_number}>{h.hall_number}</option>)}
+                  </select>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setPreviewState((p) => ({ ...p, orientation: p.orientation === 'portrait' ? 'landscape' : 'portrait' }))}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold hover:bg-slate-700">
+                  {previewState.orientation === 'portrait' ? 'A4 Portrait' : 'A4 Landscape'}
+                </button>
+                <button type="button" onClick={() => setPreviewState((p) => ({ ...p, lang: p.lang === 'en' ? 'bn' : 'en' }))}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold hover:bg-slate-700 font-bangla">
+                  {previewState.lang === 'en' ? 'English / বাংলা' : 'বাংলা / English'}
+                </button>
+                <button type="button" onClick={() => openPrintPdfWindow(currentPreviewHtml)}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700">Download / Print PDF</button>
+                <button type="button" onClick={() => setPreviewState((p) => ({ ...p, open: false }))}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700">Close</button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-200 p-3 overflow-auto">
+              <iframe title="PDF Preview" srcDoc={currentPreviewHtml} className="w-full h-[72vh] bg-white rounded-lg border border-slate-300" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
-    </html>
+</html>
