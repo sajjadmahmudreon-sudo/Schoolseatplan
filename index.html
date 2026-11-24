@@ -71,6 +71,24 @@ function toEnglishDigits(val) {
 }
 function fmtNum(val, lang) { return lang === 'bn' ? toBengaliDigits(val) : String(val); }
 
+function parseGender(v) {
+  const x = String(v ?? '').trim().toLowerCase();
+  if (['m', 'male', 'boy', 'boys', 'b', 'ছেলে', 'পুরুষ'].includes(x)) return 'M';
+  if (['f', 'female', 'girl', 'girls', 'g', 'মেয়ে', 'নারী'].includes(x)) return 'F';
+  return '';
+}
+function genderBreakdownText(allocs, lang, isBn) {
+  let m = 0, f = 0;
+  (allocs || []).forEach((a) => { if (a.student_gender_snapshot === 'M') m++; else if (a.student_gender_snapshot === 'F') f++; });
+  if (!m && !f) return '';
+  return ` (${isBn ? 'ছেলে' : 'Boys'} ${fmtNum(m, lang)} • ${isBn ? 'মেয়ে' : 'Girls'} ${fmtNum(f, lang)})`;
+}
+function hallGenderTag(g, isBn) {
+  if (g === 'M') return isBn ? ' (ছেলে)' : ' (Boys)';
+  if (g === 'F') return isBn ? ' (মেয়ে)' : ' (Girls)';
+  return '';
+}
+
 function todayLocal() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -118,23 +136,32 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
   const queues = {};
   allSelectedClassKeys.forEach((c) => { queues[c] = [...byClass[c]]; });
 
-  const popFromClass = (c) => {
-    const clsNum = Number(c);
-    if (queues[clsNum] && queues[clsNum].length > 0) return queues[clsNum].shift();
-    return null;
+  let curGender = 'all'; // 'all' | 'M' | 'F' (set per hall)
+  const hasFor = (c) => {
+    const q = queues[c];
+    if (!q || q.length === 0) return false;
+    return curGender === 'all' ? true : q.some((s) => s.gender === curGender);
   };
+  const takeFrom = (c) => {
+    const q = queues[c];
+    if (!q || q.length === 0) return null;
+    if (curGender === 'all') return q.shift();
+    const i = q.findIndex((s) => s.gender === curGender);
+    return i === -1 ? null : q.splice(i, 1)[0];
+  };
+  const popFromClass = (c) => takeFrom(Number(c));
 
   const popFromList = (list, preferDifferentClass = null) => {
     if (!Array.isArray(list) || list.length === 0) return null;
     if (preferDifferentClass !== null) {
       for (const c of list) {
-        if (Number(c) !== Number(preferDifferentClass) && queues[c]?.length > 0) {
-          return queues[c].shift();
+        if (Number(c) !== Number(preferDifferentClass) && hasFor(c)) {
+          return takeFrom(c);
         }
       }
     }
     for (const c of list) {
-      if (queues[c]?.length > 0) return queues[c].shift();
+      if (hasFor(c)) return takeFrom(c);
     }
     return null;
   };
@@ -145,6 +172,7 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
 
   hallsConfig.forEach((hall, hIdx) => {
     const hallId = hall.id || `hall-${hIdx + 1}`;
+    curGender = (hall.gender === 'M' || hall.gender === 'F') ? hall.gender : 'all';
     const hallNumber = String(hall.hall_number || `Hall ${hIdx + 1}`).trim();
     const totalRows = 1;
     const seatsPerBench = Math.min(3, Math.max(1, Number(hall.seats_per_bench) || 2));
@@ -177,6 +205,20 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
     colBenches.forEach((bc) => { hallCapacity += totalRows * bc * seatsPerBench; });
     const maxBenches = Math.max(...colBenches);
 
+    // Column-wise gender mode: each column has its own gender (default: col 1 = Girls, col 2 = Boys, ...).
+    // Pass 1 fills every column with its own gender only; pass 2 fills the leftover (tail) seats with the other gender.
+    const isColMode = hall.gender === 'COL';
+    const columnGenders = Array.from({ length: colCount }, (_, ci) => {
+      const g = Array.isArray(hall.column_genders) ? hall.column_genders[ci] : '';
+      return (g === 'M' || g === 'F') ? g : (ci % 2 === 0 ? 'F' : 'M');
+    });
+    const fixedHallGender = (hall.gender === 'M' || hall.gender === 'F') ? hall.gender : 'all';
+    const benchNoMap = {};
+    { let bc = 0; for (let b = 1; b <= maxBenches; b++) for (let c = 0; c < colCount; c++) if (b <= colBenches[c]) benchNoMap[`${c}-${b}`] = ++bc; }
+    const seatClsMap = {};
+    const passes = isColMode ? ['primary', 'overflow'] : ['single'];
+
+    passes.forEach((pass) => {
     for (let bInCol = 1; bInCol <= maxBenches; bInCol++) {
       for (let colIdx = 0; colIdx < colCount; colIdx++) {
         const rowNum = 1;
@@ -184,13 +226,18 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
         const secondaryClass = cornerClasses[(colIdx + 1) % cornerClasses.length];
 
         if (bInCol <= colBenches[colIdx]) {
-          benchCounter += 1;
+          const benchCounter = benchNoMap[`${colIdx}-${bInCol}`];
           let prevCls = null;
           let leftCornerCls = null;
           const isThree = seatsPerBench === 3;
 
           for (let seatIdx = 0; seatIdx < seatsPerBench; seatIdx++) {
             let student = null;
+            const seatKey = `${colIdx}-${bInCol}-${seatIdx}`;
+            if (seatClsMap[seatKey] !== undefined) continue; // already filled in an earlier pass
+            prevCls = seatIdx > 0 ? (seatClsMap[`${colIdx}-${bInCol}-${seatIdx - 1}`] ?? null) : null;
+            leftCornerCls = isThree ? (seatClsMap[`${colIdx}-${bInCol}-0`] ?? null) : null;
+            curGender = pass === 'primary' ? columnGenders[colIdx] : pass === 'overflow' ? 'all' : fixedHallGender;
             const isMiddleSeat = isThree && seatIdx === 1;
             // For 3-seat benches the two corner seats behave exactly like a 2-seat bench (left = 0, right = 1)
             const cornerPos = isThree ? (seatIdx === 2 ? 1 : 0) : seatIdx;
@@ -263,6 +310,7 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
 
             if (student && !allocatedIds.has(student.id)) {
               allocatedIds.add(student.id);
+              seatClsMap[seatKey] = Number(student.class);
               hallAllocatedCount += 1;
               allocations.push({
                 id: `${hallId}-c${colIdx + 1}-r${rowNum}-b${bInCol}-s${seatIdx + 1}`,
@@ -277,13 +325,15 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
                 student_id: student.id,
                 student_name_snapshot: student.name,
                 student_roll_snapshot: Number(student.roll),
-                student_class_snapshot: Number(student.class)
+                student_class_snapshot: Number(student.class),
+                student_gender_snapshot: student.gender || ''
               });
             }
           }
         }
       }
     }
+    });
 
     const hallAllocForSummary = allocations.filter((a) => a.hall_number === hallNumber);
     const classBreakdown = {};
@@ -292,9 +342,15 @@ function allocateSeats(selectedStudents, hallsConfig, pattern) {
       classBreakdown[c] = (classBreakdown[c] || 0) + 1;
     });
 
+    const genderBreakdown = { M: 0, F: 0 };
+    hallAllocForSummary.forEach((a) => { if (a.student_gender_snapshot === 'M') genderBreakdown.M += 1; else if (a.student_gender_snapshot === 'F') genderBreakdown.F += 1; });
+
     hallSummaries.push({
       id: hallId,
       hall_number: hallNumber,
+      gender: isColMode ? 'COL' : (fixedHallGender === 'all' ? '' : fixedHallGender),
+      column_genders: isColMode ? columnGenders : [],
+      gender_breakdown: genderBreakdown,
       total_rows: totalRows,
       column_count: colCount,
       column_benches: colBenches,
@@ -353,16 +409,16 @@ function buildLayoutSections({ hallSummaries, allocations, hallFilter, lang, t, 
           benchesHtml += `<div class="bench"><div class="bench-no">${t.bench} ${fmtNum(n, lang)}</div><div class="seats">${seats}</div></div>`;
         }
       }
-      return `<div class="lcol"><div class="lcol-title">${t.bench} - ${t.col} - ${fmtNum(cIdx + 1, lang)}</div>${benchesHtml}</div>`;
+      return `<div class="lcol"><div class="lcol-title">${t.bench} - ${t.col} - ${fmtNum(cIdx + 1, lang)}${h.gender === 'COL' ? hallGenderTag((h.column_genders || [])[cIdx], isBn) : ''}</div>${benchesHtml}</div>`;
     }).join('');
 
     return `
       <div class="layout-page ${idx > 0 ? 'page-break' : ''}">
         <div class="layout-top">
           <div class="hall-info">
-            <div class="big">${t.hall}: ${esc(h.hall_number)}</div>
+            <div class="big">${t.hall}: ${esc(h.hall_number)}${hallGenderTag(h.gender, isBn)}</div>
             <div class="class-breakdown">${perClassLines.map((line) => `<div>${line}</div>`).join('')}</div>
-            <div class="total-line"><strong>${t.totalStudents}: ${fmtNum(hallAlloc.length, lang)}</strong></div>
+            <div class="total-line"><strong>${t.totalStudents}: ${fmtNum(hallAlloc.length, lang)}${genderBreakdownText(hallAlloc, lang, isBn)}</strong></div>
           </div>
           <div style="flex:1"></div>
           <div class="shift-info">
@@ -440,11 +496,11 @@ function buildPrintableHtml({ exam, allocations, hallSummaries, settings, mode, 
         <div class="hall-block ${idx > 0 && mode === 'complete' ? 'page-break' : ''}">
           <div class="hall-header">
             <div>
-              <strong>${t.hall}: ${esc(h.hall_number)}</strong>
+              <strong>${t.hall}: ${esc(h.hall_number)}${hallGenderTag(h.gender, isBn)}</strong>
               <span class="meta-muted"> (${colBreakdown} | ${t.seat}/${t.bench}: ${fmtNum(h.seats_per_bench, lang)})</span>
               <div class="hall-class-line">${perClassSummary}</div>
             </div>
-            <div>${t.totalStudents}: <strong>${fmtNum(hallAlloc.length, lang)}</strong></div>
+            <div>${t.totalStudents}: <strong>${fmtNum(hallAlloc.length, lang)}</strong>${genderBreakdownText(hallAlloc, lang, isBn)}</div>
           </div>
           <table>
             <thead><tr><th>#</th><th>${t.col}</th><th>${t.row}</th><th>${t.bench}</th><th>${t.seat}</th><th>${t.cls}</th><th>${t.roll}</th><th>${t.name}</th></tr></thead>
@@ -557,14 +613,14 @@ function buildPrintableHtml({ exam, allocations, hallSummaries, settings, mode, 
       </div>
       <div class="doc-badge">
         <div class="doc-type">${docTitle}</div>
-        <div>${t.totalAllocated}: <strong>${fmtNum(allocations.length, lang)}</strong></div>
+        <div>${t.totalAllocated}: <strong>${fmtNum(allocations.length, lang)}</strong>${genderBreakdownText(allocations, lang, isBn)}</div>
       </div>
     </div>
     <div class="meta-grid">
       <div><strong>${t.examDate}:</strong> ${esc(fmtNum(exam.exam_date, lang))}</div>
       <div><strong>${t.shift}:</strong> ${esc(shiftName)}</div>
       ${exam.exam_time ? `<div><strong>${isBn ? 'সময়' : 'Time'}:</strong> ${esc(fmtNum(exam.exam_time, lang))}</div>` : ''}
-      <div><strong>${t.totalAllocated}:</strong> ${fmtNum(allocations.length, lang)}</div>
+      <div><strong>${t.totalAllocated}:</strong> ${fmtNum(allocations.length, lang)}${genderBreakdownText(allocations, lang, isBn)}</div>
     </div>
     ${bodySections}
   </div>
@@ -617,7 +673,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
   const [sortRollAsc, setSortRollAsc] = useState(true);
-  const [stuForm, setStuForm] = useState({ id: null, name: '', roll: '', class: 1 });
+  const [stuGenderFilter, setStuGenderFilter] = useState('ALL');
+  const [genderFilter, setGenderFilter] = useState('ALL');
+  const [stuForm, setStuForm] = useState({ id: null, name: '', roll: '', class: 1, gender: '' });
   const [stuError, setStuError] = useState('');
   const [importReport, setImportReport] = useState(null);
 
@@ -650,6 +708,12 @@ function App() {
   const [historyDate, setHistoryDate] = useState('');
   const [selectedHistoryExam, setSelectedHistoryExam] = useState(null);
 
+  const genderCounts = useMemo(() => ({
+    M: students.filter((s) => s.gender === 'M').length,
+    F: students.filter((s) => s.gender === 'F').length,
+    none: students.filter((s) => s.gender !== 'M' && s.gender !== 'F').length
+  }), [students]);
+
   const classCounts = useMemo(() => {
     const counts = {};
     CLASSES.forEach((c) => (counts[c] = 0));
@@ -661,6 +725,7 @@ function App() {
     return students
       .filter((s) => {
         if (classFilter !== 'ALL' && Number(s.class) !== Number(classFilter)) return false;
+        if (stuGenderFilter === 'NONE' ? !!s.gender : (stuGenderFilter !== 'ALL' && s.gender !== stuGenderFilter)) return false;
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
         return String(s.name).toLowerCase().includes(q) || String(s.roll).toLowerCase().includes(q);
@@ -669,7 +734,7 @@ function App() {
         if (classFilter === 'ALL' && Number(a.class) !== Number(b.class)) return Number(a.class) - Number(b.class);
         return sortRollAsc ? Number(a.roll) - Number(b.roll) : Number(b.roll) - Number(a.roll);
       });
-  }, [students, searchQuery, classFilter, sortRollAsc]);
+  }, [students, searchQuery, classFilter, sortRollAsc, stuGenderFilter]);
 
   const handleSaveStudent = (e) => {
     e.preventDefault();
@@ -680,32 +745,37 @@ function App() {
     if (!cleanName) { setStuError('Student Name is required.'); return; }
     if (!Number.isInteger(rollNum) || rollNum <= 0) { setStuError('Roll Number must be a positive integer.'); return; }
     if (!Number.isInteger(clsNum) || clsNum < 1 || clsNum > 10) { setStuError('Class must be between 1 and 10.'); return; }
+    if (stuForm.gender !== 'M' && stuForm.gender !== 'F') { setStuError('Please select Gender (Male / Female).'); return; }
     const duplicate = students.find((s) => Number(s.class) === clsNum && Number(s.roll) === rollNum && s.id !== stuForm.id);
     if (duplicate) { setStuError(`Duplicate Roll ${rollNum} in Class ${clsNum} (${duplicate.name}).`); return; }
 
     const now = new Date().toISOString();
     if (stuForm.id) {
-      setStudents((prev) => prev.map((s) => (s.id === stuForm.id ? { ...s, name: cleanName, roll: rollNum, class: clsNum, updated_at: now } : s)));
+      setStudents((prev) => prev.map((s) => (s.id === stuForm.id ? { ...s, name: cleanName, roll: rollNum, class: clsNum, gender: stuForm.gender, updated_at: now } : s)));
     } else {
       setStudents((prev) => [...prev, {
         id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: cleanName, roll: rollNum, class: clsNum, created_at: now, updated_at: now
+        name: cleanName, roll: rollNum, class: clsNum, gender: stuForm.gender, created_at: now, updated_at: now
       }]);
     }
-    setStuForm({ id: null, name: '', roll: '', class: clsNum });
+    setStuForm({ id: null, name: '', roll: '', class: clsNum, gender: stuForm.gender });
+  };
+
+  const setStudentGender = (id, g) => {
+    setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, gender: g, updated_at: new Date().toISOString() } : s)));
   };
 
   const handleDeleteStudent = (student) => {
     if (window.confirm(`Delete "${student.name}" (Class ${student.class}, Roll ${student.roll})?`)) {
       setStudents((prev) => prev.filter((s) => s.id !== student.id));
       setExcludedIds((prev) => prev.filter((x) => x !== student.id));
-      if (stuForm.id === student.id) setStuForm({ id: null, name: '', roll: '', class: 1 });
+      if (stuForm.id === student.id) setStuForm({ id: null, name: '', roll: '', class: 1, gender: '' });
     }
   };
 
   const handleDownloadTemplate = () => {
     if (!window.XLSX) { alert('Excel library is still loading. Please try again in a moment.'); return; }
-    const ws = window.XLSX.utils.aoa_to_sheet([['Name', 'Roll', 'Class'], ['Sample Student One', 1, 1], ['Sample Student Two', 2, 1]]);
+    const ws = window.XLSX.utils.aoa_to_sheet([['Name', 'Roll', 'Class', 'Gender'], ['Sample Student One', 1, 1, 'Male'], ['Sample Student Two', 2, 1, 'Female']]);
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'StudentsTemplate');
     window.XLSX.writeFile(wb, 'student_import_template.xlsx');
@@ -737,6 +807,9 @@ function App() {
           const rawName = String(row.name ?? '').trim();
           const rawRoll = row.roll ?? '';
           const rawClass = row.class ?? '';
+          const rawGenderVal = row.gender ?? row['লিঙ্গ'] ?? '';
+          const gender = parseGender(rawGenderVal);
+          if (String(rawGenderVal).trim() !== '' && !gender) { errors.push(`Row ${rowNum} (${rawName}): Invalid Gender "${rawGenderVal}" (use Male / Female).`); return; }
           if (!rawName || rawRoll === '' || rawClass === '') { errors.push(`Row ${rowNum}: Missing required field (Name, Roll, or Class).`); return; }
           const rollNum = Number(toEnglishDigits(String(rawRoll).trim()));
           const clsNum = Number(toEnglishDigits(String(rawClass).trim()));
@@ -747,7 +820,7 @@ function App() {
           }
           workingList.push({
             id: `stu-${Date.now()}-${rowNum}-${Math.random().toString(36).slice(2, 5)}`,
-            name: rawName, roll: rollNum, class: clsNum, created_at: now, updated_at: now
+            name: rawName, roll: rollNum, class: clsNum, gender, created_at: now, updated_at: now
           });
           addedCount += 1;
         });
@@ -773,10 +846,16 @@ function App() {
   const fetchedStudents = useMemo(() => {
     return students
       .filter((s) => selectedClasses.includes(Number(s.class)))
+      .filter((s) => genderFilter === 'ALL' || s.gender === genderFilter)
       .sort((a, b) => (Number(a.class) !== Number(b.class) ? Number(a.class) - Number(b.class) : Number(a.roll) - Number(b.roll)));
-  }, [students, selectedClasses]);
+  }, [students, selectedClasses, genderFilter]);
 
   const activeSelectedStudents = useMemo(() => fetchedStudents.filter((s) => !excludedIds.includes(s.id)), [fetchedStudents, excludedIds]);
+
+  const noGenderSelected = useMemo(
+    () => students.filter((s) => selectedClasses.includes(Number(s.class)) && s.gender !== 'M' && s.gender !== 'F').length,
+    [students, selectedClasses]
+  );
 
   const addHall = () => {
     setHallsConfig((prev) => {
@@ -785,7 +864,7 @@ function App() {
       while (used.has(`Hall ${n}`)) n++;
       return [...prev, {
         id: `h-${Date.now()}`, hall_number: `Hall ${n}`, total_rows: 1, column_count: 2, column_benches: [4, 4], seats_per_bench: 2,
-        assigned_classes: [...selectedClasses], fallback_classes: [], middle_classes: [], middle_class: '', middle_fallback_class: ''
+        assigned_classes: [...selectedClasses], fallback_classes: [], middle_classes: [], middle_class: '', middle_fallback_class: '', gender: ''
       }];
     });
     setGeneratedPlan(null);
@@ -817,6 +896,16 @@ function App() {
       const cur = Array.isArray(h[fieldName]) ? h[fieldName] : [];
       const next = cur.includes(cls) ? cur.filter((x) => x !== cls) : [...cur, cls].sort((a, b) => a - b);
       return { ...h, [fieldName]: next };
+    }));
+    setGeneratedPlan(null);
+  };
+  const updateColumnGender = (hallIdx, colIdx, g) => {
+    setHallsConfig((prev) => prev.map((h, i) => {
+      if (i !== hallIdx) return h;
+      const cnt = Math.max(1, Number(h.column_count) || (h.column_benches || []).length || 2);
+      const next = Array.from({ length: cnt }, (_, ci) => (h.column_genders && h.column_genders[ci]) || (ci % 2 === 0 ? 'F' : 'M'));
+      next[colIdx] = g;
+      return { ...h, column_genders: next };
     }));
     setGeneratedPlan(null);
   };
@@ -969,7 +1058,7 @@ function App() {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">Student Management</h2>
-                  <p className="text-xs text-slate-500">Permanent storage active • Total Students: <strong>{students.length}</strong></p>
+                  <p className="text-xs text-slate-500">Permanent storage active • Total Students: <strong>{students.length}</strong> • Boys: <strong className="text-sky-700">{genderCounts.M}</strong> • Girls: <strong className="text-pink-700">{genderCounts.F}</strong>{genderCounts.none > 0 && <span> • Gender not set: <strong className="text-amber-700">{genderCounts.none}</strong></span>}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handleDownloadTemplate} className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition">
@@ -1030,13 +1119,24 @@ function App() {
                       {CLASSES.map((c) => <option key={c} value={c}>Class {c}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className={LBL}>4. Gender *</label>
+                    <div className="flex gap-2">
+                      {[['M', 'Male / ছেলে'], ['F', 'Female / মেয়ে']].map(([g, label]) => (
+                        <button key={g} type="button" onClick={() => setStuForm({ ...stuForm, gender: g })}
+                          className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition font-bangla ${stuForm.gender === g ? (g === 'M' ? 'bg-sky-600 text-white border-sky-600' : 'bg-pink-600 text-white border-pink-600') : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {stuError && <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">{stuError}</div>}
                   <div className="flex items-center gap-2 pt-1">
                     <button type="submit" className="flex-1 py-2 px-4 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
                       {stuForm.id ? 'Update Student' : 'Save Student'}
                     </button>
                     {stuForm.id && (
-                      <button type="button" onClick={() => { setStuForm({ id: null, name: '', roll: '', class: 1 }); setStuError(''); }}
+                      <button type="button" onClick={() => { setStuForm({ id: null, name: '', roll: '', class: 1, gender: '' }); setStuError(''); }}
                         className="py-2 px-3 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300">Cancel</button>
                     )}
                   </div>
@@ -1051,6 +1151,12 @@ function App() {
                     <option value="ALL">All Classes (1–10)</option>
                     {CLASSES.map((c) => <option key={c} value={c}>Class {c}</option>)}
                   </select>
+                  <select value={stuGenderFilter} onChange={(e) => setStuGenderFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    <option value="ALL">All (Boys + Girls)</option>
+                    <option value="M">Boys only</option>
+                    <option value="F">Girls only</option>
+                    <option value="NONE">Gender not set</option>
+                  </select>
                   <button onClick={() => setSortRollAsc((p) => !p)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50">
                     Roll: {sortRollAsc ? 'Asc ↑' : 'Desc ↓'}
                   </button>
@@ -1060,19 +1166,27 @@ function App() {
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 text-left">
                         <th className="p-2.5 border-b">Class</th><th className="p-2.5 border-b">Roll</th>
-                        <th className="p-2.5 border-b">Student Name</th><th className="p-2.5 border-b text-right">Actions</th>
+                        <th className="p-2.5 border-b">Student Name</th><th className="p-2.5 border-b">Gender</th><th className="p-2.5 border-b text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStudents.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-400">No students found matching your filter.</td></tr>
+                        <tr><td colSpan="5" className="p-6 text-center text-slate-400">No students found matching your filter.</td></tr>
                       ) : filteredStudents.map((stu) => (
                         <tr key={stu.id} className="border-b last:border-b-0 hover:bg-slate-50">
                           <td className="p-2.5 font-medium">Class {stu.class}</td>
                           <td className="p-2.5 font-bold text-blue-700">{stu.roll}</td>
                           <td className="p-2.5 font-bangla">{stu.name}</td>
+                          <td className="p-2.5">
+                            <select value={stu.gender || ''} onChange={(e) => setStudentGender(stu.id, e.target.value)}
+                              className={`px-2 py-1 rounded border text-xs font-semibold ${stu.gender === 'M' ? 'bg-sky-50 border-sky-300 text-sky-800' : stu.gender === 'F' ? 'bg-pink-50 border-pink-300 text-pink-800' : 'bg-amber-50 border-amber-300 text-amber-800'}`}>
+                              <option value="">Not set</option>
+                              <option value="M">Male</option>
+                              <option value="F">Female</option>
+                            </select>
+                          </td>
                           <td className="p-2.5 text-right space-x-2">
-                            <button onClick={() => { setStuError(''); setStuForm({ id: stu.id, name: stu.name, roll: stu.roll, class: stu.class }); }}
+                            <button onClick={() => { setStuError(''); setStuForm({ id: stu.id, name: stu.name, roll: stu.roll, class: stu.class, gender: stu.gender || '' }); }}
                               className="px-2.5 py-1 rounded bg-amber-100 text-amber-800 text-xs font-semibold hover:bg-amber-200">Edit</button>
                             <button onClick={() => handleDeleteStudent(stu)}
                               className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 text-xs font-semibold hover:bg-rose-200">Delete</button>
@@ -1133,7 +1247,7 @@ function App() {
                   <p className="text-xs text-slate-500">Select classes to automatically pull students from the database. Uncheck any student to exclude.</p>
                 </div>
                 <div className="text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
-                  Selected Students: {activeSelectedStudents.length} / {fetchedStudents.length}
+                  Selected Students: {activeSelectedStudents.length} / {fetchedStudents.length} • Boys: {activeSelectedStudents.filter((x) => x.gender === 'M').length} • Girls: {activeSelectedStudents.filter((x) => x.gender === 'F').length}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1144,6 +1258,18 @@ function App() {
                   </button>
                 ))}
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-700">Students:</span>
+                {[['ALL', 'Boys + Girls'], ['M', 'Boys only'], ['F', 'Girls only']].map(([g, label]) => (
+                  <button key={g} type="button" onClick={() => { setGenderFilter(g); setGeneratedPlan(null); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${genderFilter === g ? 'bg-fuchsia-600 text-white border-fuchsia-600' : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'}`}>
+                    {label}
+                  </button>
+                ))}
+                {noGenderSelected > 0 && (genderFilter !== 'ALL' || hallsConfig.some((h) => h.gender)) && (
+                  <span className="text-xs text-amber-700 font-medium">{noGenderSelected} student(s) in selected classes have no gender set, so they will not be seated in Boys/Girls halls.</span>
+                )}
+              </div>
               {fetchedStudents.length > 0 && (
                 <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2.5 bg-slate-50 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {fetchedStudents.map((stu) => {
@@ -1151,7 +1277,7 @@ function App() {
                     return (
                       <label key={stu.id}
                         className={`flex items-center justify-between px-3 py-1.5 rounded border text-xs cursor-pointer ${isExcluded ? 'bg-rose-50 border-rose-200 text-rose-500 line-through' : 'bg-white border-slate-200 text-slate-800'}`}>
-                        <span className="truncate font-bangla"><strong>C{stu.class} • R{stu.roll}:</strong> {stu.name}</span>
+                        <span className="truncate font-bangla"><strong>C{stu.class} • R{stu.roll}{stu.gender === 'M' ? ' (M)' : stu.gender === 'F' ? ' (F)' : ''}:</strong> {stu.name}</span>
                         <input type="checkbox" checked={!isExcluded} onChange={() => toggleExcludeStudent(stu.id)} className="ml-2" />
                       </label>
                     );
@@ -1200,6 +1326,21 @@ function App() {
                           <option value={3}>3 Seats / Bench</option>
                         </select>
                       </div>
+                      <div className="w-36">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Hall for</label>
+                        <select value={hall.gender || ''} onChange={(e) => updateHallField(hIdx, 'gender', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-sm font-semibold">
+                          <option value="">Boys + Girls</option>
+                          <option value="M">Boys only</option>
+                          <option value="F">Girls only</option>
+                          <option value="COL">Column-wise (Girls | Boys)</option>
+                        </select>
+                      </div>
+                      {hall.gender === 'COL' && (
+                        <div className="w-full text-[11px] text-fuchsia-800 bg-fuchsia-50 border border-fuchsia-200 rounded-lg px-2.5 py-1.5">
+                          Each column gets its own gender first. If one gender has more students, the extra students sit in the last (empty) part of the other gender's column.
+                        </div>
+                      )}
                       {Number(hall.seats_per_bench) === 3 && (
                         <div className="w-full bg-blue-50/70 border border-blue-200 rounded-lg p-2.5 space-y-1.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1297,6 +1438,14 @@ function App() {
                               if (isNaN(parsed) || parsed < 1) updateColumnBenchCount(hIdx, cIdx, 1);
                             }}
                             className="w-16 px-2 py-1 border border-slate-300 rounded text-xs font-bold text-center" />
+                          {hall.gender === 'COL' && (
+                            <select value={(hall.column_genders && hall.column_genders[cIdx]) || (cIdx % 2 === 0 ? 'F' : 'M')}
+                              onChange={(e) => updateColumnGender(hIdx, cIdx, e.target.value)}
+                              className="px-2 py-1 border border-fuchsia-300 bg-fuchsia-50 rounded text-xs font-semibold text-fuchsia-900">
+                              <option value="F">Girls</option>
+                              <option value="M">Boys</option>
+                            </select>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1316,18 +1465,18 @@ function App() {
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-slate-800">Generated Allocation ({generatedPlan.allocations.length} seats allocated)</h3>
+                    <h3 className="font-bold text-slate-800">Generated Allocation ({generatedPlan.allocations.length} seats allocated • Boys {generatedPlan.allocations.filter((a) => a.student_gender_snapshot === 'M').length} • Girls {generatedPlan.allocations.filter((a) => a.student_gender_snapshot === 'F').length})</h3>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {generatedPlan.hallSummaries.map((hs) => (
                         <span key={hs.id} className="text-xs bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md text-slate-700">
                           <strong>{hs.hall_number}:</strong>{' '}
                           {Object.entries(hs.class_breakdown || {}).map(([c, cnt]) => `Class ${c} = ${cnt}`).join(', ') || '0'}
-                          {' '}• <strong>Total = {hs.allocated_count}</strong>
+                          {' '}• <strong>Total = {hs.allocated_count}</strong>{' '}(Boys {hs.gender_breakdown?.M || 0} • Girls {hs.gender_breakdown?.F || 0})
                         </span>
                       ))}
                     </div>
                     {generatedPlan.unallocated.length > 0 && (
-                      <p className="text-xs text-amber-700 font-medium mt-1">Warning: {generatedPlan.unallocated.length} student(s) could not fit in the current halls. Click '+ Add Hall' and generate again.</p>
+                      <p className="text-xs text-amber-700 font-medium mt-1">Warning: {generatedPlan.unallocated.length} student(s) could not fit in the current halls (check hall capacity and the Boys/Girls setting). Click '+ Add Hall' and generate again.</p>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
